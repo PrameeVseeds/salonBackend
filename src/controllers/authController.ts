@@ -49,3 +49,13 @@ export const getProfile = (req: AuthenticationRequest, res: Response): void => {
         },
     });
 };
+
+export const getSuperAdminDashboard = (req: AuthenticationRequest, res: Response): void =>{
+    res.status(200).json({
+        success: true,
+        message: "Welcome to the Super Admin Dashboard.",
+         data: {
+            user: req.user,
+        },
+    });
+};
