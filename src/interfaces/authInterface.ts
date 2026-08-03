@@ -19,6 +19,12 @@ export interface LoginRequest {
     password: string;
 }
 
+export interface UpdateProfileInput {
+    firstName: string;
+    lastName: string;
+    email: string;
+}
+
 export interface JwtPayload {
     id: number;
     first_name: string;
