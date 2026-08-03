@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { loginUser } from "../services/authService.js";
+import { AuthenticationRequest } from "../middleware/authMiddleware.js";
 
 export const login = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -37,4 +38,14 @@ export const login = async (req: Request, res: Response): Promise<void> => {
             message,
         });
     }
+};
+
+export const getProfile = (req: AuthenticationRequest, res: Response): void => {
+    res.status(200).json({
+        success: true,
+        message: "User profile retrieved successfully.",
+        data: {
+            user: req.user,
+        },
+    });
 };
