@@ -1,0 +1,44 @@
+import crypto from "node:crypto";
+import path from "node:path";
+import type { Request } from "express";
+import multer from "multer";
+
+const uploadDirectory = path.resolve("uploads/customers");
+
+const storage = multer.diskStorage({destination: (_req, _file, callback) => {
+    callback(null, uploadDirectory);
+  },
+
+  filename: (_req, file, callback) => {
+    const extension = path.extname(file.originalname).toLowerCase();
+    const fileName = `${crypto.randomUUID()}${extension}`;
+
+    callback(null, fileName);
+  },
+});
+
+const allowedMimeTypes = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+];
+
+const fileFilter: multer.Options["fileFilter"] = (_req: Request,file,callback) => {
+  if (!allowedMimeTypes.includes(file.mimetype)) {
+    callback(
+      new Error("Only JPG, PNG and WEBP images are allowed.")
+    );
+    return;
+  }
+  callback(null, true);
+};
+
+// Handles customer profile image uploads with type and size limits.
+export const uploadCustomerImage = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 2 * 1024 * 1024,
+    files: 1,
+  },
+});

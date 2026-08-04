@@ -1,5 +1,6 @@
 import express, {type ErrorRequestHandler,type RequestHandler,} from "express";
 import apiRoutes from "./routes/appRoutes.js";
+import path from "path";
 
 const app = express();
 
@@ -13,6 +14,8 @@ const healthCheckHandler: RequestHandler = (_req, res) => {
 };
 
 app.get("/", healthCheckHandler);
+
+app.use("/uploads",express.static(path.resolve("uploads")));
 
 app.use("/api", apiRoutes);
 
