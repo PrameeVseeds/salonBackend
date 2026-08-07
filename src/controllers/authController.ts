@@ -1,27 +1,8 @@
 import type { Request, Response } from "express";
 import { changeUserPassword, getUserProfileById, loginUser, updateUserProfileById } from "../services/authService.js";
 import { AuthenticationRequest } from "../middleware/authMiddleware.js";
+import { formatUserProfile } from "../utils/userMapper.js";
 import { validateChangePassword, validateLogin, validateUpdateProfile } from "../validators/authValidator.js";
-
-const formatProfileUser = (user: {
-    id: number;
-    first_name: string;
-    last_name: string;
-    email: string;
-    role: string;
-    is_active: boolean;
-    created_at: Date;
-    updated_at: Date;
-}) => ({
-    id: user.id,
-    firstName: user.first_name,
-    lastName: user.last_name,
-    email: user.email,
-    role: user.role,
-    isActive: Boolean(user.is_active),
-    createdAt: user.created_at,
-    updatedAt: user.updated_at,
-});
 
 export const login = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -95,7 +76,7 @@ export const getProfile = async (req: AuthenticationRequest, res: Response): Pro
             success: true,
             message: "Profile retrieved successfully.",
             data: {
-                user: formatProfileUser(user),
+                user: formatUserProfile(user),
             },
         });
     }
@@ -142,7 +123,7 @@ export const updateProfile = async (req: AuthenticationRequest, res: Response): 
             success: true,
             message: "Profile updated successfully.",
             data: {
-                user: formatProfileUser(updatedUser),
+                user: formatUserProfile(updatedUser),
             },
         });
     }

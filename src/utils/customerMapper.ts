@@ -1,4 +1,4 @@
-import type { CustomerRow } from "../interfaces/customerInterface.js";
+import type { CustomerRow } from "../models/customerModel.js";
 
 // Converts database customer rows into API-safe response objects.
 export const formatCustomer = (customer: CustomerRow) => ({

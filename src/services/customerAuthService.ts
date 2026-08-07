@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
-import type { CustomerLoginInput, CustomerPasswordResetResult, CustomerRow, RegisterCustomerInput, UpdateCustomerProfileInput } from "../interfaces/customerInterface.js";
+import type { CustomerLoginInput, CustomerPasswordResetResult, RegisterCustomerInput, UpdateCustomerProfileInput } from "../interfaces/customerInterface.js";
+import type { CustomerRow } from "../models/customerModel.js";
 import * as customerRepository from "../repositories/customerRepository.js";
 import { generateCustomerToken } from "../utils/customerJwt.js";
 

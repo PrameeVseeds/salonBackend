@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { createAdmin, deleteAdminById, findAdminById, getAllAdmins, resetAdminPasswordById, updateAdminById, updateAdminStatusById } from "../services/adminService.js";
+import { formatAdmin } from "../utils/adminMapper.js";
 import { validateAdminId, validateAdminStatus, validateCreateAdmin, validateResetAdminPassword, validateUpdateAdmin } from "../validators/adminValidator.js";
 
 export const createAdminAccount = async (req: Request, res: Response): Promise<void> => {
@@ -19,15 +20,7 @@ export const createAdminAccount = async (req: Request, res: Response): Promise<v
         res.status(201).json({
             success: true,
             message: "Admin created successfully.",
-            data: {
-                id: admin?.id,
-                firstName: admin?.first_name,
-                lastName: admin?.last_name,
-                email: admin?.email,
-                role: admin?.role,
-                isActive: Boolean(admin?.is_active),
-                createdAt: admin?.created_at,
-            },
+            data: admin ? formatAdmin(admin) : null,
         });
     }
     catch (error) {
@@ -48,15 +41,7 @@ export const getAdmins = async (req: Request, res: Response): Promise<void> => {
         res.status(200).json({
             success: true,
             message: "Admins retrieved successfully.",
-            data: admins.map(admin => ({
-                id: admin.id,
-                firstName: admin.first_name,
-                lastName: admin.last_name,
-                email: admin.email,
-                role: admin.role,
-                isActive: Boolean(admin.is_active),
-                createdAt: admin.created_at,
-            })),
+            data: admins.map(formatAdmin),
         });
     }
     catch (error) {
@@ -89,7 +74,9 @@ export const getAdminById = async (req: Request, res: Response): Promise<void> =
         res.status(200).json({
             success: true,
             message: "Admin retrieved successfully.",
-            data: admin,
+            data: {
+                admin: formatAdmin(admin),
+            },
         });
     }
     catch (error) {
@@ -135,16 +122,7 @@ export const updateAdmin = async (req: Request, res: Response): Promise<void> =>
             success: true,
             message: "Admin updated successfully.",
             data: {
-                admin: {
-                    id: updatedAdmin.id,
-                    firstName: updatedAdmin.first_name,
-                    lastName: updatedAdmin.last_name,
-                    email: updatedAdmin.email,
-                    role: updatedAdmin.role,
-                    isActive: Boolean(updatedAdmin.is_active),
-                    createdAt: updatedAdmin.created_at,
-                    updatedAt: updatedAdmin.updated_at,
-                },
+                admin: formatAdmin(updatedAdmin),
             }
         });
     }
@@ -194,15 +172,7 @@ export const updateAdminStatus = async (req: Request, res: Response): Promise<vo
             success: true,
             message: statusValidation.data ? "Admin activated successfully." : "Admin deactivated successfully.",
             data: {
-                admin: {
-                    id: updatedAdmin.id,
-                    firstName: updatedAdmin.first_name,
-                    lastName: updatedAdmin.last_name,
-                    email: updatedAdmin.email,
-                    role: updatedAdmin.role,
-                    isActive: Boolean(updatedAdmin.is_active),
-                    updatedAt: updatedAdmin.updated_at,
-                },
+                admin: formatAdmin(updatedAdmin),
             },
         });
     }

@@ -1,6 +1,7 @@
 import type { PoolConnection, ResultSetHeader } from "mysql2/promise";
 import { pool } from "../config/db.js";
-import type { CustomerRow, PasswordResetTokenRow, RegisterCustomerInput, UpdateCustomerProfileInput } from "../interfaces/customerInterface.js";
+import type { RegisterCustomerInput, UpdateCustomerProfileInput } from "../interfaces/customerInterface.js";
+import type { CustomerRow, PasswordResetTokenRow } from "../models/customerModel.js";
 
 const customerSelectFields =
     `id,
