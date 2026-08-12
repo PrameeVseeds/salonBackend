@@ -1,21 +1,9 @@
 import type { CreateAdminRequest, UpdateAdminRequest } from "../interfaces/adminInterface.js";
-
-type ValidationResult<T> =
-    | { isValid: true; data: T }
-    | { isValid: false; message: string };
+import { getString, type ValidationResult } from "./validationUtils.js";
 
 interface ResetAdminPasswordRequest {
     newPassword: string;
 }
-
-const getString = (value: unknown): string | null => {
-    if (typeof value !== "string") {
-        return null;
-    }
-
-    const trimmedValue = value.trim();
-    return trimmedValue.length > 0 ? trimmedValue : null;
-};
 
 const getAdminName = (body: Record<string, unknown>, snakeCaseKey: string, camelCaseKey: string): string | null => {
     return getString(body[snakeCaseKey]) ?? getString(body[camelCaseKey]);

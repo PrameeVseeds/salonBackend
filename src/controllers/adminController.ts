@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { createAdmin, deleteAdminById, findAdminById, getAllAdmins, resetAdminPasswordById, updateAdminById, updateAdminStatusById } from "../services/adminService.js";
-import { formatAdmin } from "../utils/adminMapper.js";
+import { formatAdmin } from "../utils/mappers/adminMapper.js";
+import { sendBadRequest } from "../utils/responseHelper.js";
 import { validateAdminId, validateAdminStatus, validateCreateAdmin, validateResetAdminPassword, validateUpdateAdmin } from "../validators/adminValidator.js";
 
 export const createAdminAccount = async (req: Request, res: Response): Promise<void> => {
@@ -8,10 +9,7 @@ export const createAdminAccount = async (req: Request, res: Response): Promise<v
         const validation = validateCreateAdmin(req.body);
 
         if (!validation.isValid) {
-            res.status(400).json({
-                success: false,
-                message: validation.message,
-            });
+            sendBadRequest(res, validation.message);
             return;
         };
 
@@ -57,10 +55,7 @@ export const getAdminById = async (req: Request, res: Response): Promise<void> =
         const idValidation = validateAdminId(req.params.id);
 
         if (!idValidation.isValid) {
-            res.status(400).json({
-                success: false,
-                message: idValidation.message,
-            });
+            sendBadRequest(res, idValidation.message);
             return;
         }
         const admin = await findAdminById(idValidation.data);
@@ -93,18 +88,12 @@ export const updateAdmin = async (req: Request, res: Response): Promise<void> =>
         const bodyValidation = validateUpdateAdmin(req.body);
 
         if (!idValidation.isValid) {
-            res.status(400).json({
-                success: false,
-                message: idValidation.message,
-            });
+            sendBadRequest(res, idValidation.message);
             return;
         }
 
         if (!bodyValidation.isValid) {
-            res.status(400).json({
-                success: false,
-                message: bodyValidation.message,
-            });
+            sendBadRequest(res, bodyValidation.message);
             return;
         }
 
@@ -143,18 +132,12 @@ export const updateAdminStatus = async (req: Request, res: Response): Promise<vo
         const statusValidation = validateAdminStatus(req.body);
 
         if (!idValidation.isValid) {
-            res.status(400).json({
-                success: false,
-                message: idValidation.message,
-            });
+            sendBadRequest(res, idValidation.message);
             return;
         }
 
         if (!statusValidation.isValid) {
-            res.status(400).json({
-                success: false,
-                message: statusValidation.message,
-            });
+            sendBadRequest(res, statusValidation.message);
             return;
         }
 
@@ -190,18 +173,12 @@ export const resetAdminPassword = async (req: Request, res: Response): Promise<v
         const passwordValidation = validateResetAdminPassword(req.body);
 
         if (!idValidation.isValid) {
-            res.status(400).json({
-                success: false,
-                message: idValidation.message,
-            });
+            sendBadRequest(res, idValidation.message);
             return;
         }
 
         if (!passwordValidation.isValid) {
-            res.status(400).json({
-                success: false,
-                message: passwordValidation.message,
-            });
+            sendBadRequest(res, passwordValidation.message);
             return;
         }
 
@@ -233,10 +210,7 @@ export const deleteAdmin = async (req: Request, res: Response): Promise<void> =>
         const idValidation = validateAdminId(req.params.id);
 
         if (!idValidation.isValid) {
-            res.status(400).json({
-                success: false,
-                message: idValidation.message,
-            });
+            sendBadRequest(res, idValidation.message);
             return;
         }
 

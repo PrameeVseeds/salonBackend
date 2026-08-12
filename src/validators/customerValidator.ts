@@ -1,6 +1,5 @@
 import type { CustomerLoginInput, RegisterCustomerInput, UpdateCustomerProfileInput } from "../interfaces/customerInterface.js";
-
-type ValidationResult<T> = | { isValid: true; data: T } | { isValid: false; message: string };
+import { getString, type ValidationResult } from "./validationUtils.js";
 
 interface ChangeCustomerPasswordInput {
     currentPassword: string;
@@ -11,15 +10,6 @@ interface ResetCustomerPasswordInput {
     token: string;
     newPassword: string;
 }
-
-const getString = (value: unknown): string | null => {
-    if (typeof value !== "string") {
-        return null;
-    }
-
-    const trimmedValue = value.trim();
-    return trimmedValue.length > 0 ? trimmedValue : null;
-};
 
 // Validates customer registration input.
 export const validateRegisterCustomer = (body: Record<string, unknown>): ValidationResult<RegisterCustomerInput> => {

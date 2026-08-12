@@ -1,4 +1,4 @@
-import type { AdminRow } from "../models/adminModel.js";
+import type { AdminRow } from "../../models/adminModel.js";
 
 // Converts database admin rows into API-safe response objects.
 export const formatAdmin = (admin: AdminRow) => ({

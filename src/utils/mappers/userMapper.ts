@@ -1,4 +1,4 @@
-import type { UserRow } from "../models/userModel.js";
+import type { UserRow } from "../../models/userModel.js";
 
 // Converts database user rows into API-safe profile response objects.
 export const formatUserProfile = (user: UserRow) => ({

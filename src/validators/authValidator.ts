@@ -1,22 +1,10 @@
 import type { LoginRequest, UpdateProfileInput } from "../interfaces/authInterface.js";
-
-type ValidationResult<T> =
-    | { isValid: true; data: T }
-    | { isValid: false; message: string };
+import { getString, type ValidationResult } from "./validationUtils.js";
 
 interface ChangePasswordInput {
     currentPassword: string;
     newPassword: string;
 }
-
-const getString = (value: unknown): string | null => {
-    if (typeof value !== "string") {
-        return null;
-    }
-
-    const trimmedValue = value.trim();
-    return trimmedValue.length > 0 ? trimmedValue : null;
-};
 
 export const validateLogin = (body: Record<string, unknown>): ValidationResult<LoginRequest> => {
     const email = getString(body.email);
