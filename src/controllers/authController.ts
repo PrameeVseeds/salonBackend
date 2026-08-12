@@ -1,7 +1,8 @@
 import type { Request, Response } from "express";
 import { changeUserPassword, getUserProfileById, loginUser, updateUserProfileById } from "../services/authService.js";
 import { AuthenticationRequest } from "../middleware/authMiddleware.js";
-import { formatUserProfile } from "../utils/userMapper.js";
+import { formatUserProfile } from "../utils/mappers/userMapper.js";
+import { sendBadRequest } from "../utils/responseHelper.js";
 import { validateChangePassword, validateLogin, validateUpdateProfile } from "../validators/authValidator.js";
 
 export const login = async (req: Request, res: Response): Promise<void> => {
@@ -9,10 +10,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         const validation = validateLogin(req.body);
 
         if (!validation.isValid) {
-            res.status(400).json({
-                success: false,
-                message: validation.message,
-            });
+            sendBadRequest(res, validation.message);
             return;
         }
 
@@ -102,10 +100,7 @@ export const updateProfile = async (req: AuthenticationRequest, res: Response): 
         }
 
         if (!validation.isValid) {
-            res.status(400).json({
-                success: false,
-                message: validation.message,
-            });
+            sendBadRequest(res, validation.message);
             return;
         }
 
@@ -152,10 +147,7 @@ export const changePassword = async (req: AuthenticationRequest, res: Response):
         }
 
         if (!validation.isValid) {
-            res.status(400).json({
-                success: false,
-                message: validation.message,
-            });
+            sendBadRequest(res, validation.message);
             return;
         }
 

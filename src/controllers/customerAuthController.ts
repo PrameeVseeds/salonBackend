@@ -3,7 +3,8 @@ import path from "node:path";
 import type { Request, Response } from "express";
 import type { CustomerAuthRequest } from "../middleware/customerAuthMiddleware.js";
 import { sendCustomerPasswordResetEmail } from "../services/emailService.js";
-import { formatCustomer } from "../utils/customerMapper.js";
+import { formatCustomer } from "../utils/mappers/customerMapper.js";
+import { sendBadRequest } from "../utils/responseHelper.js";
 import {
     changeCustomerPassword,
     createCustomerPasswordResetToken,
@@ -22,13 +23,6 @@ import {
     validateResetCustomerPassword,
     validateUpdateCustomerProfile,
 } from "../validators/customerValidator.js";
-
-const sendBadRequest = (res: Response, message: string): void => {
-    res.status(400).json({
-        success: false,
-        message,
-    });
-};
 
 const getAuthenticatedCustomerId = (req: CustomerAuthRequest): number | null => {
     return req.customer?.id ?? null;

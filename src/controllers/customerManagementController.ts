@@ -1,14 +1,8 @@
 import type { Request, Response } from "express";
 import {findCustomerByEmail,getAllCustomers,getCustomerById,updateCustomerStatusById,} from "../services/customerAuthService.js";
-import { formatCustomer } from "../utils/customerMapper.js";
+import { formatCustomer } from "../utils/mappers/customerMapper.js";
+import { sendBadRequest } from "../utils/responseHelper.js";
 import {validateCustomerEmail,validateCustomerId,validateCustomerStatus,} from "../validators/customerValidator.js";
-
-const sendBadRequest = (res: Response, message: string): void => {
-    res.status(400).json({
-        success: false,
-        message,
-    });
-};
 
 // Get customers.
 export const getCustomers = async (_req: Request, res: Response): Promise<void> => {
