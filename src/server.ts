@@ -12,7 +12,16 @@ const port = Number(process.env.PORT) || DEFAULT_PORT;
 async function startServer(): Promise<void> {
   try {
     await testDatabaseConnection();
-    await verifyEmailConnection();
+
+    try {
+      await verifyEmailConnection();
+      console.log("Email service connected successfully!");
+    } catch (error: unknown) {
+      console.warn(
+        "Email service is unavailable. The API will start, but email features will fail until SMTP credentials are corrected.",
+      );
+      console.warn(error instanceof Error ? error.message : error);
+    }
 
     app.listen(port, HOST, () => {
       console.log(`Salon API is running on port ${port}`);
