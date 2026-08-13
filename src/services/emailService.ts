@@ -26,6 +26,12 @@ export const verifyEmailConnection = async (): Promise<void> => {
     await transporter.verify();
 };
 
+export const sendEmail = async (to: string, subject: string, text: string): Promise<void> => {
+    await transporter.sendMail(
+        { from: { name: emailFromName, address: emailFromAddress }, 
+        to, subject, text });
+};
+
 interface SendPasswordResetEmailInput {
     email: string;
     firstName: string;

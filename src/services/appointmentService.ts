@@ -2,6 +2,7 @@ import type { AppointmentFilters, AppointmentRequest, AvailabilityQuery } from "
 import * as appointmentInterface from "../interfaces/appointmentServiceInterface.js";
 import type { AppointmentRow } from "../models/appointmentModel.js";
 import * as repository from "../repositories/appointmentRepository.js";
+import { createAppointmentConfirmation } from "./notificationService.js";
 
 const toMinutes = (time: string): number => {
     const [hours = 0, minutes = 0] = time.split(":").map(Number);
@@ -109,7 +110,13 @@ const saveAppointment = async (customerId: number, input: AppointmentRequest, ap
     return appointment;
 };
 
-export const createAppointment = (customerId: number, input: AppointmentRequest) => saveAppointment(customerId, input);
+export const createAppointment = async (customerId: number, input: AppointmentRequest): Promise<AppointmentRow> => {
+    const appointment = await saveAppointment(customerId, input);
+    await createAppointmentConfirmation(appointment).
+    catch((error) => console.error("Failed to create appointment notification:", error));
+    return appointment;
+};
+
 export const updateAppointment = (id: number, customerId: number, input: AppointmentRequest) => saveAppointment(customerId, input, id);
 export const getMyAppointments = (customerId: number) => repository.findByCustomer(customerId);
 export const getOwnedAppointment = (id: number, customerId: number) => repository.findOwnedById(id, customerId);

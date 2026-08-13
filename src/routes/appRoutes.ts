@@ -11,6 +11,7 @@ import businessBreakRoutes from "./businessBreakRoutes.js";
 import closedDateRoutes from "./closedDateRoutes.js";
 import appointmentRoutes from "./appointmentRoutes.js";
 import galleryRoutes from "./galleryRoutes.js";
+import notificationRoutes from "./notificationRoutes.js";
 
 const router = Router();
 
@@ -34,5 +35,6 @@ router.use("/business-breaks", businessBreakRoutes);
 router.use("/closed-dates", closedDateRoutes);
 router.use("/appointments", appointmentRoutes);
 router.use("/gallery", galleryRoutes);
+router.use("/notifications", notificationRoutes);
 
 export default router;
