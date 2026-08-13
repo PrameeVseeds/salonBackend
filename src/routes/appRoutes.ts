@@ -7,6 +7,7 @@ import employeeRoutes from "./employeeRoutes.js";
 import serviceRoutes from "./serviceRoutes.js";
 import employeeLeaveRoutes from "./employeeLeaveRoutes.js";
 import workingHoursRoutes from "./workingHoursRoutes.js";
+import businessBreakRoutes from "./businessBreakRoutes.js";
 
 const router = Router();
 
@@ -26,5 +27,6 @@ router.use("/employees", employeeRoutes);
 router.use("/services", serviceRoutes);
 router.use("/employee-leaves", employeeLeaveRoutes);
 router.use("/working-hours", workingHoursRoutes);
+router.use("/business-breaks", businessBreakRoutes);
 
 export default router;
