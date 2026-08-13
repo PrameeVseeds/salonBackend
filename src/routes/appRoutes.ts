@@ -10,6 +10,7 @@ import workingHoursRoutes from "./workingHoursRoutes.js";
 import businessBreakRoutes from "./businessBreakRoutes.js";
 import closedDateRoutes from "./closedDateRoutes.js";
 import appointmentRoutes from "./appointmentRoutes.js";
+import galleryRoutes from "./galleryRoutes.js";
 
 const router = Router();
 
@@ -32,5 +33,6 @@ router.use("/working-hours", workingHoursRoutes);
 router.use("/business-breaks", businessBreakRoutes);
 router.use("/closed-dates", closedDateRoutes);
 router.use("/appointments", appointmentRoutes);
+router.use("/gallery", galleryRoutes);
 
 export default router;
