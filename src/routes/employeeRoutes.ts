@@ -1,6 +1,7 @@
 import { Router } from "express";
 import * as employeeController from "../controllers/employeeController.js";
 import * as employeeServiceController from "../controllers/employeeServiceController.js";
+import * as employeeLeaveController from "../controllers/employeeLeaveController.js";
 
 const router = Router();
 
@@ -9,6 +10,7 @@ router.get("/", employeeController.getAllEmployees);
 router.get("/get-by-email", employeeController.getEmployeeByEmail);
 router.get("/get-by-name", employeeController.getEmployeeByName);
 router.get("/get-by-phone", employeeController.getEmployeeByPhone);
+router.get("/:employeeId/leaves", employeeLeaveController.getEmployeeLeaves);
 router.post("/:employeeId/services/:serviceId", employeeServiceController.assignService);
 router.get("/:employeeId/services", employeeServiceController.getEmployeeServices);
 router.delete("/:employeeId/services/:serviceId", employeeServiceController.removeService);

@@ -5,6 +5,7 @@ import customerRoutes from "./customerRoutes.js"
 import customerManagementRoutes from "./customerManagementRoutes.js";
 import employeeRoutes from "./employeeRoutes.js";
 import serviceRoutes from "./serviceRoutes.js";
+import employeeLeaveRoutes from "./employeeLeaveRoutes.js";
 
 const router = Router();
 
@@ -22,5 +23,6 @@ router.use("/customers", customerRoutes);
 router.use("/customers", customerManagementRoutes);
 router.use("/employees", employeeRoutes);
 router.use("/services", serviceRoutes);
+router.use("/employee-leaves", employeeLeaveRoutes);
 
 export default router;
