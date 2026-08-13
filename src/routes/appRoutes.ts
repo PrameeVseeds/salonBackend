@@ -1,7 +1,7 @@
-import {Router,type Request,type Response,} from "express";
+import { Router, type Request, type Response } from "express";
 import adminRoutes from "./adminRoutes.js";
 import authRoutes from "./authRoutes.js";
-import customerRoutes from "./customerRoutes.js"
+import customerRoutes from "./customerRoutes.js";
 import customerManagementRoutes from "./customerManagementRoutes.js";
 import employeeRoutes from "./employeeRoutes.js";
 import serviceRoutes from "./serviceRoutes.js";
@@ -12,16 +12,17 @@ import closedDateRoutes from "./closedDateRoutes.js";
 import appointmentRoutes from "./appointmentRoutes.js";
 import galleryRoutes from "./galleryRoutes.js";
 import notificationRoutes from "./notificationRoutes.js";
+import settingsRoutes from "./settingsRoutes.js";
+import themeSettingsRoutes from "./themeSettingsRoutes.js";
 
 const router = Router();
 
-router.get("/health",(_req: Request, res: Response) => {
-    res.status(200).json({
-      success: true,
-      message: "API routes are working",
-    });
-  }
-);
+router.get("/health", (_req: Request, res: Response) => {
+  res.status(200).json({
+    success: true,
+    message: "API routes are working",
+  });
+});
 
 router.use("/auth", authRoutes);
 router.use("/admins", adminRoutes);
@@ -36,5 +37,7 @@ router.use("/closed-dates", closedDateRoutes);
 router.use("/appointments", appointmentRoutes);
 router.use("/gallery", galleryRoutes);
 router.use("/notifications", notificationRoutes);
+router.use("/settings", settingsRoutes);
+router.use("/theme-settings", themeSettingsRoutes);
 
 export default router;
