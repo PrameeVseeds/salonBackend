@@ -1,0 +1,121 @@
+import { unlink } from "node:fs/promises";
+import path from "node:path";
+import type { Request, Response } from "express";
+import type { HeroMediaType } from "../models/themeSettingsModel.js";
+import * as themeSettingsService from "../services/themeSettingsService.js";
+import { formatThemeSettings } from "../utils/mappers/themeSettingsMapper.js";
+import { sendBadRequest } from "../utils/responseHelper.js";
+import { validateThemeSettings } from "../validators/themeSettingsValidator.js";
+
+const removeUploadedFile = async (filePath: string | null): Promise<void> => {
+  if (filePath) await unlink(filePath).catch(() => undefined);
+};
+
+const removeManagedHeroMedia = async (
+  mediaUrl: string | null,
+): Promise<void> => {
+  if (mediaUrl?.startsWith("/uploads/theme/")) {
+    await removeUploadedFile(
+      path.resolve("uploads", "theme", path.basename(mediaUrl)),
+    );
+  }
+};
+
+export const getThemeSettings = async (_req: Request, res: Response,): Promise<void> => {
+  try {
+    const themeSettings = await themeSettingsService.getThemeSettings();
+    if (!themeSettings) {
+      res.status(404).json({
+        success: false,
+        message: "Theme settings have not been configured.",
+      });
+      return;
+    }
+    res.json({
+      success: true,
+      data: { themeSettings: formatThemeSettings(themeSettings) },
+    });
+  } catch {
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to retrieve theme settings." });
+  }
+};
+
+export const updateThemeSettings = async (req: Request,res: Response,): Promise<void> => {
+  const validation = validateThemeSettings(req.body ?? {});
+  if (!validation.isValid) return sendBadRequest(res, validation.message);
+  try {
+    const updatedThemeSettings = await themeSettingsService.updateThemeSettings(
+      validation.data,
+    );
+    res.json({
+      success: true,
+      message: "Theme settings updated successfully.",
+      data: {
+        themeSettings:
+          updatedThemeSettings && formatThemeSettings(updatedThemeSettings),
+      },
+    });
+  } catch {
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to update theme settings." });
+  }
+};
+
+export const updateHeroMedia = async (req: Request,res: Response,): Promise<void> => {
+  const uploadedFilePath = req.file
+    ? path.resolve("uploads/theme", req.file.filename)
+    : null;
+  const heroMediaType = req.body?.heroMediaType ?? req.body?.hero_media_type;
+  if (heroMediaType !== "Image" && heroMediaType !== "Video") {
+    await removeUploadedFile(uploadedFilePath);
+    return sendBadRequest(res, "Hero media type must be Image or Video.");
+  }
+
+  if (!req.file) return sendBadRequest(res, "Hero media file is required.");
+  const mediaTypeMatchesFile =
+    heroMediaType === "Image"
+      ? req.file.mimetype.startsWith("image/")
+      : req.file.mimetype.startsWith("video/");
+
+  if (!mediaTypeMatchesFile) {
+    await removeUploadedFile(uploadedFilePath);
+    return sendBadRequest(
+      res,
+      `Uploaded file must match ${heroMediaType} media type.`,
+    );
+  }
+  try {
+    const existingThemeSettings = await themeSettingsService.getThemeSettings();
+    if (!existingThemeSettings) {
+      await removeUploadedFile(uploadedFilePath);
+      res.status(404).json({
+        success: false,
+        message: "Configure theme settings before uploading hero media.",
+      });
+      return;
+    }
+    const updatedThemeSettings = await themeSettingsService.updateHeroMedia(
+      heroMediaType as HeroMediaType,
+      `/uploads/theme/${req.file.filename}`,
+    );
+    await removeManagedHeroMedia(existingThemeSettings.hero_media_url);
+    res.json({
+      success: true,
+      message: "Hero media updated successfully.",
+      data: {
+        themeSettings:
+          updatedThemeSettings && formatThemeSettings(updatedThemeSettings),
+      },
+    });
+  } 
+  catch {
+    await removeUploadedFile(uploadedFilePath);
+    res
+      .status(500).json(
+        { success: false, message: "Failed to update hero media." }
+      );
+  }
+};

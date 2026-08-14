@@ -1,0 +1,19 @@
+import type { SettingsRow } from "../../models/settingsModel.js";
+
+export const formatSettings = (settings: SettingsRow) => ({
+  id: settings.id,
+  salonName: settings.salon_name,
+  phone: settings.phone,
+  email: settings.email,
+  address: settings.address,
+  logoUrl: settings.logo_url,
+  facebookUrl: settings.facebook_url,
+  instagramUrl: settings.instagram_url,
+  whatsappNumber: settings.whatsapp_number,
+  allowCustomerChooseEmployee: Boolean(settings.allow_customer_choose_employee),
+  enableOnlinePayment: Boolean(settings.enable_online_payment),
+  bookingIntervalMinutes: settings.booking_interval_minutes,
+  appointmentBufferMinutes: settings.appointment_buffer_minutes,
+  createdAt: settings.created_at,
+  updatedAt: settings.updated_at,
+});
