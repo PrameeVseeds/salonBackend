@@ -119,3 +119,31 @@ export const updateHeroMedia = async (req: Request,res: Response,): Promise<void
       );
   }
 };
+
+export const deleteHeroMedia = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const existingThemeSettings = await themeSettingsService.getThemeSettings();
+    if (!existingThemeSettings) {
+      res.status(404).json({ success: false, 
+        message: "Theme settings have not been configured." });
+      return;
+    }
+
+    const updatedThemeSettings = await themeSettingsService.updateHeroMedia(
+      existingThemeSettings.hero_media_type,
+      null,
+    );
+    await removeManagedHeroMedia(existingThemeSettings.hero_media_url);
+    res.json({
+      success: true,
+      message: "Hero media removed successfully.",
+      data: {
+        themeSettings: updatedThemeSettings && formatThemeSettings(updatedThemeSettings),
+      },
+    });
+  } catch {
+    res.status(500).json({ success: false, 
+      message: "Failed to remove hero media." 
+    });
+  }
+};

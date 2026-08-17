@@ -4,6 +4,19 @@ import { formatService } from "../utils/mappers/serviceMapper.js";
 import { sendBadRequest } from "../utils/responseHelper.js";
 import * as serviceValidator from "../validators/serviceValidator.js";
 
+export const uploadImage = async (req: Request, res: Response): Promise<void> => {
+    if (!req.file) {
+        sendBadRequest(res, "Service image is required.");
+        return;
+    }
+
+    res.status(201).json({
+        success: true,
+        message: "Service image uploaded successfully.",
+        data: { imageUrl: `/uploads/services/${req.file.filename}` },
+    });
+};
+
 export const createService = async (req: Request, res: Response): Promise<void> => {
     try {
         const validation = serviceValidator.validateRegisterService(req.body);

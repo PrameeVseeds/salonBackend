@@ -4,5 +4,5 @@ import * as themeSettingsRepository from "../repositories/themeSettingsRepositor
 
 export const getThemeSettings = () => themeSettingsRepository.getThemeSettings();
 export const updateThemeSettings = (input: ThemeSettingsInput) => themeSettingsRepository.updateThemeSettings(input);
-export const updateHeroMedia = (heroMediaType: HeroMediaType, heroMediaUrl: string,) => 
+export const updateHeroMedia = (heroMediaType: HeroMediaType, heroMediaUrl: string | null,) => 
   themeSettingsRepository.updateHeroMedia(heroMediaType, heroMediaUrl);

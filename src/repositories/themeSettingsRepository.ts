@@ -1,6 +1,6 @@
 import { pool } from "../config/db.js";
 import type { ThemeSettingsInput } from "../interfaces/themeSettingsInterface.js";
-import type {HeroMediaType,ThemeSettingsRow,} from "../models/themeSettingsModel.js";
+import type { HeroMediaType, ThemeSettingsRow, } from "../models/themeSettingsModel.js";
 
 const themeSettingsSelectFields =
   "id, primary_color, secondary_color, accent_color, hero_media_type, hero_media_url, created_at, updated_at";
@@ -32,11 +32,13 @@ export const updateThemeSettings = async (input: ThemeSettingsInput,): Promise<T
   return getThemeSettings();
 };
 
-export const updateHeroMedia = async (heroMediaType: HeroMediaType,heroMediaUrl: string,): Promise<ThemeSettingsRow | null> => {
-  await pool.execute(
-    `UPDATE theme_settings SET hero_media_type = ?, hero_media_url = ?
+export const updateHeroMedia =
+  async (heroMediaType: HeroMediaType, heroMediaUrl: string | null,):
+    Promise<ThemeSettingsRow | null> => {
+    await pool.execute(
+      `UPDATE theme_settings SET hero_media_type = ?, hero_media_url = ?
     WHERE id = 1`,
-    [heroMediaType, heroMediaUrl],
-  );
-  return getThemeSettings();
-};
+      [heroMediaType, heroMediaUrl],
+    );
+    return getThemeSettings();
+  };

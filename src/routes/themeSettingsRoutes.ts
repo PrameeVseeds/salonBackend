@@ -7,7 +7,8 @@ import { uploadHeroMedia } from "../middleware/settingsMediaUploadMiddleware.js"
 const themeSettingsRoutes = Router();
 
 themeSettingsRoutes.get("/", themeSettingsController.getThemeSettings);
-themeSettingsRoutes.put("/",authenticateUser,authorizeRoles("super_admin"),themeSettingsController.updateThemeSettings,);
-themeSettingsRoutes.patch("/hero-media",authenticateUser,authorizeRoles("super_admin"),uploadHeroMedia.single("heroMedia"),themeSettingsController.updateHeroMedia,);
+themeSettingsRoutes.put("/",authenticateUser,authorizeRoles("admin", "super_admin"),themeSettingsController.updateThemeSettings,);
+themeSettingsRoutes.patch("/hero-media",authenticateUser,authorizeRoles("admin", "super_admin"),uploadHeroMedia.single("heroMedia"),themeSettingsController.updateHeroMedia,);
+themeSettingsRoutes.delete("/hero-media",authenticateUser,authorizeRoles("admin", "super_admin"),themeSettingsController.deleteHeroMedia,);
 
 export default themeSettingsRoutes;
