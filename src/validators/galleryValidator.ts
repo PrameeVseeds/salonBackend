@@ -27,7 +27,9 @@ export const validateGalleryId = (value: string | string[] | undefined): Validat
 
 export const validateGalleryMetadata = (body: Record<string, unknown>): ValidationResult<GalleryMetadataInput> => {
     const title = getString(body.title);
-    const category = getString(body.category);
+    const rawCategoryId = body.category_id ?? body.categoryId;
+    const categoryId = rawCategoryId === undefined || rawCategoryId === "" || rawCategoryId === null
+        ? null : Number(rawCategoryId);
     const displayOrder = parseOrder(body.display_order ?? body.displayOrder);
     const rawActive = body.is_active ?? body.isActive;
     const isActive = rawActive === undefined ? true : parseBoolean(rawActive);
@@ -38,15 +40,15 @@ export const validateGalleryMetadata = (body: Record<string, unknown>): Validati
     if (title.length > 150) 
         return { isValid: false, message: "Title cannot exceed 150 characters." };
 
-    if (category && category.length > 100) 
-        return { isValid: false, message: "Category cannot exceed 100 characters." };
+    if (categoryId !== null && (!Number.isInteger(categoryId) || categoryId <= 0))
+        return { isValid: false, message: "Category must be a valid gallery category." };
 
     if (displayOrder === null) 
         return { isValid: false, message: "Display order must be a non-negative whole number." };
     if (isActive === null) 
         return { isValid: false, message: "Active status must be true or false." };
 
-    return { isValid: true, data: { title, category, display_order: displayOrder, is_active: isActive } };
+    return { isValid: true, data: { title, category_id: categoryId, display_order: displayOrder, is_active: isActive } };
 };
 
 export const validateGalleryStatus = (body: Record<string, unknown>): ValidationResult<boolean> => {

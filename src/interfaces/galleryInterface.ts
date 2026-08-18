@@ -1,6 +1,6 @@
 export interface GalleryMetadataInput {
     title: string;
-    category: string | null;
+    category_id: number | null;
     display_order: number;
     is_active: boolean;
 }

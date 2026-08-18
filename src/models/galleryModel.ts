@@ -4,6 +4,7 @@ export interface GalleryImageRow extends RowDataPacket {
     id: number;
     title: string;
     image_url: string;
+    category_id: number | null;
     category: string | null;
     display_order: number;
     is_active: boolean;
