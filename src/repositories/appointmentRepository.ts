@@ -5,7 +5,8 @@ import * as appointmentsServiceInterface from "../interfaces/appointmentServiceI
 import type { AppointmentRow } from "../models/appointmentModel.js";
 
 const fields =`id, customer_id, employee_id, service_id, appointment_date, 
-start_time, end_time, total_amount, notes, created_at, updated_at`;
+start_time, end_time, total_amount, notes, status, started_at, completed_at,
+cancelled_at, cancellation_reason, created_at, updated_at`;
 
 export const findActiveService = async (
   serviceId: number,
@@ -98,7 +99,8 @@ export const findAppointmentTimeRanges = async (
   const [rows] = await db.execute<appointmentsServiceInterface.AppointmentTimeRange[]>(
     `SELECT start_time, end_time 
         FROM appointments
-         WHERE employee_id = ? AND appointment_date = ?${exclusion}`,
+         WHERE employee_id = ? AND appointment_date = ?
+           AND status IN ('Scheduled', 'In Progress')${exclusion}`,
     values,
   );
   return rows;
@@ -157,26 +159,44 @@ export const findAll = async (filters: AppointmentFilters,): Promise<Appointment
   const conditions: string[] = [];
   const values: Array<string | number> = [];
   if (filters.date) {
-    conditions.push("appointment_date = ?");
+    conditions.push("a.appointment_date = ?");
     values.push(filters.date);
   }
 
   if (filters.employeeId) {
-    conditions.push("employee_id = ?");
+    conditions.push("a.employee_id = ?");
     values.push(filters.employeeId);
   }
 
   if (filters.customerId) {
-    conditions.push("customer_id = ?");
+    conditions.push("a.customer_id = ?");
     values.push(filters.customerId);
+  }
+  if (filters.status) {
+    conditions.push("a.status = ?");
+    values.push(filters.status);
+  }
+  if (filters.search) {
+    conditions.push("(CONCAT(c.first_name, ' ', c.last_name) LIKE ? OR c.phone LIKE ? OR c.email LIKE ?)");
+    const term = `%${filters.search}%`;
+    values.push(term, term, term);
   }
 
   const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
 
   const [rows] = await pool.execute<AppointmentRow[]>(
-    `SELECT ${fields} 
-        FROM appointments${where} 
-        ORDER BY appointment_date DESC, start_time DESC`,
+    `SELECT a.id, a.customer_id, a.employee_id, a.service_id, a.appointment_date,
+            a.start_time, a.end_time, a.total_amount, a.notes, a.status, a.started_at,
+            a.completed_at, a.cancelled_at, a.cancellation_reason, a.created_at, a.updated_at,
+            CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
+            c.phone AS customer_phone, c.email AS customer_email,
+            CASE WHEN e.id IS NULL THEN NULL ELSE CONCAT(e.first_name, ' ', e.last_name) END AS employee_name,
+            s.name AS service_name, s.duration_minutes AS service_duration_minutes
+        FROM appointments a
+        INNER JOIN customers c ON c.id = a.customer_id
+        LEFT JOIN employees e ON e.id = a.employee_id
+        INNER JOIN services s ON s.id = a.service_id${where}
+        ORDER BY a.appointment_date DESC, a.start_time DESC`,
     values
   );
   return rows;
@@ -300,6 +320,46 @@ export const removeOwned = async (id: number,customerId: number,): Promise<boole
   const [result] = await pool.execute<ResultSetHeader>(
     "DELETE FROM appointments WHERE id = ? AND customer_id = ?",
     [id, customerId],
+  );
+  return result.affectedRows > 0;
+};
+
+export const updateStatus = async (id: number,fromStatus: AppointmentRow["status"],
+  toStatus: AppointmentRow["status"]): Promise<boolean> => {
+  const timestampColumn = toStatus === "In Progress"
+    ? "started_at"
+    : toStatus === "Completed"
+      ? "completed_at"
+      : "cancelled_at";
+  const [result] = await pool.execute<ResultSetHeader>(
+    `UPDATE appointments
+        SET status = ?, ${timestampColumn} = CURRENT_TIMESTAMP
+      WHERE id = ? AND status = ?`,
+    [toStatus, id, fromStatus],
+  );
+  return result.affectedRows > 0;
+};
+
+export const cancelOverdue = async (): Promise<number> => {
+  const [result] = await pool.execute<ResultSetHeader>(
+    `UPDATE appointments a
+       JOIN settings s ON s.id = 1
+        SET a.status = 'Cancelled',
+            a.cancelled_at = CURRENT_TIMESTAMP,
+            a.cancellation_reason = 'Customer did not arrive within the configured grace period.'
+      WHERE a.status = 'Scheduled'
+        AND TIMESTAMP(a.appointment_date, a.start_time)
+            + INTERVAL s.appointment_grace_period_minutes MINUTE <= CURRENT_TIMESTAMP`,
+  );
+  return result.affectedRows;
+};
+
+export const cancel = async (id: number, reason: string): Promise<boolean> => {
+  const [result] = await pool.execute<ResultSetHeader>(
+    `UPDATE appointments
+        SET status = 'Cancelled', cancelled_at = CURRENT_TIMESTAMP, cancellation_reason = ?
+      WHERE id = ? AND status IN ('Scheduled', 'In Progress')`,
+    [reason, id],
   );
   return result.affectedRows > 0;
 };

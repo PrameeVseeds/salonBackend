@@ -104,8 +104,12 @@ export const getOwned = async (req: CustomerAuthRequest, res: Response): Promise
 export const updateOwned = async (req: CustomerAuthRequest, res: Response): Promise<void> => {
     const id = validateAppointmentId(req.params.id);
     const body = validateAppointmentRequest(req.body ?? {});
-    if (!id.isValid) return sendBadRequest(res, id.message);
-    if (!body.isValid) return sendBadRequest(res, body.message);
+    if (!id.isValid) 
+        return sendBadRequest(res, id.message);
+
+    if (!body.isValid) 
+        return sendBadRequest(res, body.message);
+
     try {
         const appointment = await service.updateAppointment(id.data, customerId(req), body.data);
         res.status(200).json(
@@ -161,5 +165,50 @@ export const getAll = async (req: Request, res: Response): Promise<void> => {
         res.status(500).json(
             { success: false, message: "Failed to retrieve appointments." }
         );
+    }
+};
+
+const changeStatus = async (req: Request<{ id: string }>,
+    res: Response,action: "start" | "complete",): Promise<void> => {
+    const validation = validateAppointmentId(req.params.id);
+    if (!validation.isValid) 
+        return sendBadRequest(res, validation.message);
+
+    try {
+        const appointment = action === "start"
+            ? await service.startAppointment(validation.data)
+            : await service.completeAppointment(validation.data);
+        res.status(200).json({
+            success: true,
+            message: action === "start" ? "Appointment started successfully." : "Appointment completed successfully.",
+            data: { appointment: formatAppointment(appointment) },
+        });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to update appointment status.";
+        res.status(message.includes("Only") ? 409 : 500).json({ success: false, message });
+    }
+};
+
+export const start = (req: Request<{ id: string }>, res: Response) => changeStatus(req, res, "start");
+export const complete = (req: Request<{ id: string }>, res: Response) => changeStatus(req, res, "complete");
+
+export const cancel = async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+    const validation = validateAppointmentId(req.params.id);
+    if (!validation.isValid) 
+        return sendBadRequest(res, validation.message);
+    
+    const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
+    if (!reason || reason.length > 255)
+        return sendBadRequest(res, "Cancellation reason is required and must not exceed 255 characters.");
+    try {
+        const appointment = await service.cancelAppointment(validation.data, reason);
+        res.status(200).json({
+            success: true,
+            message: "Appointment cancelled successfully.",
+            data: { appointment: formatAppointment(appointment) },
+        });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to cancel appointment.";
+        res.status(message.includes("Only") ? 409 : 500).json({ success: false, message });
     }
 };

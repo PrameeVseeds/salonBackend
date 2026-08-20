@@ -194,3 +194,38 @@ export const deleteOwnedAppointment = (id: number, customerId: number) =>
   repository.removeOwned(id, customerId);
 export const getAllAppointments = (filters: AppointmentFilters) =>
   repository.findAll(filters);
+
+export const startAppointment = async (id: number): Promise<AppointmentRow> => {
+  if (!(await repository.updateStatus(id, "Scheduled", "In Progress")))
+    throw new Error("Only a scheduled appointment can be started.");
+
+  const appointment = await repository.findById(id);
+  if (!appointment) 
+    throw new Error("Appointment not found.");
+
+  return appointment;
+};
+
+export const completeAppointment = async (id: number): Promise<AppointmentRow> => {
+  if (!(await repository.updateStatus(id, "In Progress", "Completed")))
+    throw new Error("Only an in-progress appointment can be completed.");
+
+  const appointment = await repository.findById(id);
+  if (!appointment) 
+    throw new Error("Appointment not found.");
+
+  return appointment;
+};
+
+export const cancelOverdueAppointments = () => repository.cancelOverdue();
+
+export const cancelAppointment = async (id: number, reason: string): Promise<AppointmentRow> => {
+  if (!(await repository.cancel(id, reason)))
+    throw new Error("Only a scheduled or in-progress appointment can be cancelled.");
+
+  const appointment = await repository.findById(id);
+  if (!appointment) 
+    throw new Error("Appointment not found.");
+  
+  return appointment;
+};

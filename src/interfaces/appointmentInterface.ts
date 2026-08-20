@@ -10,6 +10,8 @@ export interface AppointmentFilters {
     date?: string;
     employeeId?: number;
     customerId?: number;
+    status?: "Scheduled" | "In Progress" | "Completed" | "Cancelled";
+    search?: string;
 }
 
 export interface AvailabilityQuery {

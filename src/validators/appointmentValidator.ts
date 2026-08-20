@@ -76,15 +76,28 @@ export const validateAppointmentFilters = (query: Record<string, unknown>): Vali
 
     const employeeId = query.employeeId === undefined ? undefined : positiveId(query.employeeId);
     const customerId = query.customerId === undefined ? undefined : positiveId(query.customerId);
+    const status = query.status === undefined ? undefined : getString(query.status);
+    const statuses = ["Scheduled", "In Progress", "Completed", "Cancelled"] as const;
+    const search = query.search === undefined ? undefined : getString(query.search);
 
     if (query.employeeId !== undefined && !employeeId)
         return { isValid: false, message: "Invalid employee ID." };
 
     if (query.customerId !== undefined && !customerId)
         return { isValid: false, message: "Invalid customer ID." };
+    if (status !== undefined && !statuses.includes(status as typeof statuses[number]))
+        return { isValid: false, message: "Invalid appointment status." };
+    if (query.search !== undefined && !search)
+        return { isValid: false, message: "Search text cannot be empty." };
 
     return {
         isValid: true, data:
-            { date: dateValue, employeeId: employeeId ?? undefined, customerId: customerId ?? undefined }
+            {
+                date: dateValue,
+                employeeId: employeeId ?? undefined,
+                customerId: customerId ?? undefined,
+                status: status as AppointmentFilters["status"],
+                search: search ?? undefined,
+            }
     };
 };

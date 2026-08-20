@@ -10,6 +10,17 @@ export interface AppointmentRow extends RowDataPacket {
     end_time: string;
     total_amount: string | number;
     notes: string | null;
+    status: "Scheduled" | "In Progress" | "Completed" | "Cancelled";
+    started_at: Date | null;
+    completed_at: Date | null;
+    cancelled_at: Date | null;
+    cancellation_reason: string | null;
+    customer_name?: string;
+    customer_phone?: string;
+    customer_email?: string;
+    employee_name?: string | null;
+    service_name?: string;
+    service_duration_minutes?: number;
     created_at: Date;
     updated_at: Date;
 }

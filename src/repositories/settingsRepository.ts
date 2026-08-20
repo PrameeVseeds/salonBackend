@@ -4,10 +4,11 @@ import { pool } from "../config/db.js";
 
 const settingsSelectFields = `id, salon_name, phone, email, address, logo_url, facebook_url, 
 instagram_url, whatsapp_number, allow_customer_choose_employee, enable_online_payment, 
-booking_interval_minutes, appointment_buffer_minutes, created_at, updated_at`;
+booking_interval_minutes, appointment_buffer_minutes, appointment_grace_period_minutes, created_at, updated_at`;
 
 const insertSettingsFields = `id, salon_name, phone, email, address, facebook_url, instagram_url, whatsapp_number, 
-allow_customer_choose_employee, enable_online_payment, booking_interval_minutes, appointment_buffer_minutes`;
+allow_customer_choose_employee, enable_online_payment, booking_interval_minutes, appointment_buffer_minutes,
+appointment_grace_period_minutes`;
 
 export const getSettings = async (): Promise<SettingsRow | null> => {
   const [rows] = await pool.execute<SettingsRow[]>(
@@ -22,7 +23,7 @@ export const getSettings = async (): Promise<SettingsRow | null> => {
 export const updateSettings = async (input: SettingsInput,): Promise<SettingsRow | null> => {
   await pool.execute(
     `INSERT INTO settings (${insertSettingsFields})
-        VALUES (1,?,?,?,?,?,?,?,?,?,?,?) 
+        VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?)
         ON DUPLICATE KEY 
         UPDATE salon_name=VALUES(salon_name), 
         phone=VALUES(phone), email=VALUES(email), 
@@ -31,7 +32,8 @@ export const updateSettings = async (input: SettingsInput,): Promise<SettingsRow
         allow_customer_choose_employee=VALUES(allow_customer_choose_employee), 
         enable_online_payment=VALUES(enable_online_payment), 
         booking_interval_minutes=VALUES(booking_interval_minutes), 
-        appointment_buffer_minutes=VALUES(appointment_buffer_minutes)`,
+        appointment_buffer_minutes=VALUES(appointment_buffer_minutes),
+        appointment_grace_period_minutes=VALUES(appointment_grace_period_minutes)`,
     [
       input.salon_name,
       input.phone,
@@ -44,6 +46,7 @@ export const updateSettings = async (input: SettingsInput,): Promise<SettingsRow
       input.enable_online_payment,
       input.booking_interval_minutes,
       input.appointment_buffer_minutes,
+      input.appointment_grace_period_minutes,
     ],
   );
   return getSettings();

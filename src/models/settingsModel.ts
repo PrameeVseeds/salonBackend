@@ -14,6 +14,7 @@ export interface SettingsRow extends RowDataPacket {
   enable_online_payment: boolean;
   booking_interval_minutes: number;
   appointment_buffer_minutes: number;
+  appointment_grace_period_minutes: number;
   created_at: Date;
   updated_at: Date;
 }

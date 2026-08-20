@@ -10,4 +10,5 @@ export interface SettingsInput {
   enable_online_payment: boolean;
   booking_interval_minutes: number;
   appointment_buffer_minutes: number;
+  appointment_grace_period_minutes: number;
 }
