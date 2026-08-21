@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import type { SupportRequestInput } from "../types/support.js";
 
 const smtpHost = process.env.SMTP_HOST;
 const smtpPort = Number(process.env.SMTP_PORT);
@@ -32,6 +33,20 @@ export const sendEmail = async (to: string, subject: string, text: string): Prom
             from: { name: emailFromName, address: emailFromAddress },
             to, subject, text
         });
+};
+
+export const sendSystemSupportEmail = async (input: SupportRequestInput,): Promise<void> => {
+    if (!emailFromAddress) {
+        throw new Error("System email address is not configured.");
+    }
+
+    await transporter.sendMail({
+        from: { name: emailFromName, address: emailFromAddress },
+        to: emailFromAddress,
+        replyTo: { name: input.name, address: input.email },
+        subject: `[Admin support] ${input.subject}`,
+        text: `Name: ${input.name}\nEmail: ${input.email}\n\n${input.message}`,
+    });
 };
 
 interface SendPasswordResetEmailInput {

@@ -15,6 +15,7 @@ import galleryCategoryRoutes from "./galleryCategoryRoutes.js";
 import notificationRoutes from "./notificationRoutes.js";
 import settingsRoutes from "./settingsRoutes.js";
 import themeSettingsRoutes from "./themeSettingsRoutes.js";
+import supportRoutes from "./supportRoutes.js";
 
 const router = Router();
 
@@ -41,5 +42,6 @@ router.use("/gallery-categories", galleryCategoryRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/settings", settingsRoutes);
 router.use("/theme-settings", themeSettingsRoutes);
+router.use("/support", supportRoutes);
 
 export default router;
