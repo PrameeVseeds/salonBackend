@@ -49,6 +49,8 @@ const getScheduleContext = async (query: AvailabilityQuery,excludeAppointmentId?
       unavailable: true,
       workingDay: null,
       blocked: [],
+      serviceAppointments: [],
+      capacity: 0,
     };
   }
 
@@ -59,9 +61,11 @@ const getScheduleContext = async (query: AvailabilityQuery,excludeAppointmentId?
       unavailable: true,
       workingDay: null,
       blocked: [],
+      serviceAppointments: [],
+      capacity: 0,
     };
 
-  const [breaks, leaves, appointments] = await Promise.all([
+  const [breaks, leaves, appointments, serviceAppointments, assignedEmployeeCount] = await Promise.all([
     repository.findBusinessBreaks(query.date, db),
     repository.findApprovedEmployeeLeaves(query.employeeId, query.date, db),
     repository.findAppointmentTimeRanges(
@@ -70,12 +74,17 @@ const getScheduleContext = async (query: AvailabilityQuery,excludeAppointmentId?
       excludeAppointmentId,
       db,
     ),
+    repository.findServiceAppointmentTimeRanges(query.serviceId, query.date, excludeAppointmentId, db),
+    repository.countActiveEmployeesForService(query.serviceId, db),
   ]);
+  const configuredCapacity = selectedService.max_concurrent_appointments;
   return {
     service: selectedService,
     unavailable: false,
     workingDay,
     blocked: [...breaks, ...leaves, ...appointments],
+    serviceAppointments,
+    capacity: Math.min(configuredCapacity ?? assignedEmployeeCount, assignedEmployeeCount),
   };
 };
 
@@ -101,11 +110,11 @@ export const getAvailableSlots = async (
     start + duration + buffer <= closing;
     start += interval
   ) {
-    if (
-      !context.blocked.some((range) =>
-        overlaps(start, start + duration + buffer, range),
-      )
-    )
+    const serviceBookings = context.serviceAppointments.filter((range) =>
+      overlaps(start, start + duration + buffer, range),
+    ).length;
+    if (context.capacity > 0 && serviceBookings < context.capacity &&
+      !context.blocked.some((range) => overlaps(start, start + duration + buffer, range)))
       slots.push(toTime(start));
   }
   return slots;
@@ -122,37 +131,49 @@ const saveAppointment = async (customerId: number, input: AppointmentRequest, ap
       throw new Error("Appointment not found.");
     }
 
-    if (!(await repository.lockEmployee(connection, input.employeeId)))
-      throw new Error("Employee not found or inactive.");
+    if (!(await repository.lockService(connection, input.serviceId)))
+      throw new Error("Service not found or inactive.");
 
-    const query = {date: input.appointmentDate, serviceId: input.serviceId,employeeId: input.employeeId};
-    const context = await getScheduleContext(query, appointmentId, connection);
+    const candidates = input.employeeId
+      ? [input.employeeId]
+      : await repository.findActiveEmployeeIdsForService(input.serviceId, connection);
     const scheduling = await repository.findSchedulingSettings(connection);
-
-    if (context.unavailable || !context.workingDay)
-      throw new Error("The selected date is unavailable.");
-
     const start = toMinutes(input.startTime);
-    const end = start + Number(context.service.duration_minutes);
-    const bufferedEnd = end + Number(scheduling.appointment_buffer_minutes);
-    const opening = toMinutes(context.workingDay.opening_time);
+    let selectedEmployeeId: number | null = null;
+    let selectedContext: appointmentInterface.AppointmentScheduleContext | null = null;
 
-    if (
-      start < opening ||
-      (start - opening) % Number(scheduling.booking_interval_minutes) !== 0 ||
-      bufferedEnd > toMinutes(context.workingDay.closing_time) ||
-      context.blocked.some((range) => overlaps(start, bufferedEnd, range))
-    ) {
-      throw new Error("The selected appointment slot is no longer available.");
+    for (const candidateId of candidates) {
+      if (!(await repository.lockEmployee(connection, candidateId))) continue;
+      const context = await getScheduleContext({ date: input.appointmentDate, serviceId: input.serviceId, employeeId: candidateId }, appointmentId, connection);
+      if (context.unavailable || !context.workingDay) continue;
+      const end = start + Number(context.service.duration_minutes);
+      const bufferedEnd = end + Number(scheduling.appointment_buffer_minutes);
+      const opening = toMinutes(context.workingDay.opening_time);
+      const unavailable = start < opening ||
+        (start - opening) % Number(scheduling.booking_interval_minutes) !== 0 ||
+        bufferedEnd > toMinutes(context.workingDay.closing_time) ||
+        context.blocked.some((range) => overlaps(start, bufferedEnd, range)) ||
+        context.capacity <= 0 ||
+        context.serviceAppointments.filter((range) => overlaps(start, bufferedEnd, range)).length >= context.capacity;
+      if (!unavailable) {
+        selectedEmployeeId = candidateId;
+        selectedContext = context;
+        break;
+      }
     }
 
+    if (!selectedEmployeeId || !selectedContext)
+      throw new Error("The selected appointment slot is no longer available.");
+
+    const end = start + Number(selectedContext.service.duration_minutes);
+
     const values = {
-      employeeId: input.employeeId,
+      employeeId: selectedEmployeeId,
       serviceId: input.serviceId,
       date: input.appointmentDate,
       startTime: toTime(start),
       endTime: toTime(end),
-      amount: Number(context.service.price),
+      amount: Number(selectedContext.service.price),
       notes: input.notes,
     };
 

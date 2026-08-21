@@ -8,6 +8,8 @@ export interface ServiceRow extends RowDataPacket {
     price: number;
     image_url: string;
     is_active: boolean;
+    max_concurrent_appointments: number | null;
+    assigned_employee_count: number;
     created_at: Date;
     updated_at: Date;
 }

@@ -7,6 +7,7 @@ export interface AppointmentServiceInfo extends RowDataPacket {
   duration_minutes: number;
   price: number;
   is_active: boolean;
+  max_concurrent_appointments: number | null;
 }
 
 export interface AppointmentTimeRange extends RowDataPacket {
@@ -25,6 +26,8 @@ export interface AppointmentScheduleContext {
   unavailable: boolean;
   workingDay: AppointmentWorkingDay | null;
   blocked: AppointmentTimeRange[];
+  serviceAppointments: AppointmentTimeRange[];
+  capacity: number;
 }
 
 export interface AppointmentSchedulingSettings extends RowDataPacket {

@@ -4,7 +4,14 @@ import type {RegisterServiceInput,UpdateServiceInput,} from "../interfaces/servi
 import type { ServiceRow } from "../models/serviceModel.js";
 
 const serviceSelectFields =
-    "id, name, description, duration_minutes, price, image_url, is_active, created_at, updated_at";
+    `services.id, services.name, services.description, services.duration_minutes, services.price,
+     services.image_url, services.is_active, services.max_concurrent_appointments,
+     services.created_at, services.updated_at,
+     (SELECT COUNT(*) 
+     FROM employee_services es 
+     INNER JOIN employees e ON e.id = es.employee_id
+      WHERE es.service_id = services.id 
+      AND e.is_active = TRUE) AS assigned_employee_count`;
 
 export const findServiceById = async (serviceId: number): Promise<ServiceRow | null> => {
     const [rows] = await pool.execute<ServiceRow[]>(
@@ -55,8 +62,8 @@ export const serviceNameExistsForAnotherService = async (name: string,serviceId:
 export const createService = async (input: RegisterServiceInput): Promise<ServiceRow | null> => {
     const [result] = await pool.execute<ResultSetHeader>(
         `INSERT INTO services
-            (name, description, duration_minutes, price, image_url, is_active)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+            (name, description, duration_minutes, price, image_url, is_active, max_concurrent_appointments)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
             input.name,
             input.description,
@@ -64,6 +71,7 @@ export const createService = async (input: RegisterServiceInput): Promise<Servic
             input.price,
             input.image_url,
             input.is_active,
+            input.max_concurrent_appointments,
         ],
     );
 
@@ -78,7 +86,8 @@ export const updateService = async (serviceId: number,input: UpdateServiceInput,
              duration_minutes = ?,
              price = ?,
              image_url = ?,
-             is_active = ?
+             is_active = ?,
+             max_concurrent_appointments = ?
          WHERE id = ?`,
         [
             input.name,
@@ -87,6 +96,7 @@ export const updateService = async (serviceId: number,input: UpdateServiceInput,
             input.price,
             input.image_url,
             input.is_active,
+            input.max_concurrent_appointments,
             serviceId,
         ],
     );

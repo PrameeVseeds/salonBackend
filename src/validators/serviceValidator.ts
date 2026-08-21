@@ -18,6 +18,10 @@ const validateServicePayload = (body: Record<string, unknown>,): ValidationResul
     const price = getPositiveNumber(body.price);
     const imageUrl = getString(body.image_url ?? body.imageUrl);
     const isActive = body.is_active ?? body.isActive;
+    const capacityValue = body.max_concurrent_appointments ?? body.maxConcurrentAppointments;
+    const maxConcurrentAppointments = capacityValue === null || capacityValue === undefined || capacityValue === ""
+        ? null
+        : Number(capacityValue);
 
     if (!name || !description || !imageUrl) {
         return {
@@ -47,6 +51,13 @@ const validateServicePayload = (body: Record<string, unknown>,): ValidationResul
         };
     }
 
+    if (maxConcurrentAppointments !== null && (!Number.isInteger(maxConcurrentAppointments) || maxConcurrentAppointments <= 0)) {
+        return {
+            isValid: false,
+            message: "Appointment capacity must be a positive whole number or left automatic.",
+        };
+    }
+
     return {
         isValid: true,
         data: {
@@ -56,6 +67,7 @@ const validateServicePayload = (body: Record<string, unknown>,): ValidationResul
             price,
             image_url: imageUrl,
             is_active: isActive,
+            max_concurrent_appointments: maxConcurrentAppointments,
         },
     };
 };

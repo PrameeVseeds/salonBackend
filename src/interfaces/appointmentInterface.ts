@@ -1,5 +1,5 @@
 export interface AppointmentRequest {
-    employeeId: number;
+    employeeId: number | null;
     serviceId: number;
     appointmentDate: string;
     startTime: string;

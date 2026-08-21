@@ -8,6 +8,8 @@ export const formatService = (service: ServiceRow) => ({
     price: service.price,
     imageUrl: service.image_url,
     isActive: Boolean(service.is_active),
+    maxConcurrentAppointments: service.max_concurrent_appointments,
+    assignedEmployeeCount: Number(service.assigned_employee_count ?? 0),
     createdAt: service.created_at,
     updatedAt: service.updated_at,
 })

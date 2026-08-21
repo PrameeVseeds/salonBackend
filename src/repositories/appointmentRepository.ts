@@ -13,7 +13,7 @@ export const findActiveService = async (
   db: appointmentsServiceInterface.AppointmentQueryExecutor = pool,
 ): Promise<appointmentsServiceInterface.AppointmentServiceInfo | null> => {
   const [rows] = await db.execute<appointmentsServiceInterface.AppointmentServiceInfo[]>(
-    `SELECT id, duration_minutes, price, is_active 
+    `SELECT id, duration_minutes, price, is_active, max_concurrent_appointments
         FROM services WHERE id = ? AND is_active = TRUE 
         LIMIT 1`,
     [serviceId],
@@ -21,13 +21,53 @@ export const findActiveService = async (
   return rows[0] ?? null;
 };
 
+export const lockService = async (db: PoolConnection, serviceId: number): Promise<boolean> => {
+  const [rows] = await db.execute<import("mysql2").RowDataPacket[]>(
+    "SELECT id FROM services WHERE id = ? AND is_active = TRUE FOR UPDATE",
+    [serviceId],
+  );
+  return rows.length > 0;
+};
+
+export const countActiveEmployeesForService = async (
+  serviceId: number,
+  db: appointmentsServiceInterface.AppointmentQueryExecutor = pool,
+): Promise<number> => {
+  const [rows] = await db.execute<import("mysql2").RowDataPacket[]>(
+    `SELECT COUNT(*) AS count 
+    FROM employee_services es
+     INNER JOIN employees e ON e.id = es.employee_id
+     WHERE es.service_id = ? AND e.is_active = TRUE`,
+    [serviceId],
+  );
+  return Number(rows[0]?.count ?? 0);
+};
+
+export const findActiveEmployeeIdsForService = async (
+  serviceId: number,
+  db: appointmentsServiceInterface.AppointmentQueryExecutor = pool,
+): Promise<number[]> => {
+  const [rows] = await db.execute<import("mysql2").RowDataPacket[]>(
+    `SELECT e.id 
+    FROM employee_services es
+     INNER JOIN employees e ON e.id = es.employee_id
+     WHERE es.service_id = ? AND e.is_active = TRUE 
+     ORDER BY e.id`,
+    [serviceId],
+  );
+  return rows.map((row) => Number(row.id));
+};
+
 export const employeeOffersService = async (employeeId: number,serviceId: number,
   db: appointmentsServiceInterface.AppointmentQueryExecutor = pool,
 ): Promise<boolean> => {
   const [rows] = await db.execute<import("mysql2").RowDataPacket[]>(
-    `SELECT es.id FROM employee_services es
+    `SELECT es.id 
+    FROM employee_services es
          INNER JOIN employees e ON e.id = es.employee_id
-         WHERE es.employee_id = ? AND es.service_id = ? AND e.is_active = TRUE LIMIT 1`,
+         WHERE es.employee_id = ? 
+         AND es.service_id = ? 
+         AND e.is_active = TRUE LIMIT 1`,
     [employeeId, serviceId],
   );
   return rows.length > 0;
@@ -80,7 +120,9 @@ export const findApprovedEmployeeLeaves = async (
   const [rows] = await db.execute<appointmentsServiceInterface.AppointmentTimeRange[]>(
     `SELECT start_time, end_time 
         FROM employee_leaves 
-        WHERE employee_id = ? AND leave_date = ? AND status = 'approved'`,
+        WHERE employee_id = ? 
+        AND leave_date = ? 
+        AND status = 'approved'`,
     [employeeId, date],
   );
   return rows;
@@ -100,6 +142,26 @@ export const findAppointmentTimeRanges = async (
     `SELECT start_time, end_time 
         FROM appointments
          WHERE employee_id = ? AND appointment_date = ?
+           AND status IN ('Scheduled', 'In Progress')${exclusion}`,
+    values,
+  );
+  return rows;
+};
+
+export const findServiceAppointmentTimeRanges = async (
+  serviceId: number,
+  date: string,
+  excludeAppointmentId?: number,
+  db: appointmentsServiceInterface.AppointmentQueryExecutor = pool,
+): Promise<appointmentsServiceInterface.AppointmentTimeRange[]> => {
+  const exclusion = excludeAppointmentId ? " AND id != ?" : "";
+  const values: Array<number | string> = excludeAppointmentId
+    ? [serviceId, date, excludeAppointmentId]
+    : [serviceId, date];
+  const [rows] = await db.execute<appointmentsServiceInterface.AppointmentTimeRange[]>(
+    `SELECT start_time, end_time 
+        FROM appointments
+         WHERE service_id = ? AND appointment_date = ?
            AND status IN ('Scheduled', 'In Progress')${exclusion}`,
     values,
   );

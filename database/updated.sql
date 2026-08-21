@@ -428,11 +428,13 @@ CREATE TABLE `services` (
   `price` decimal(10,2) NOT NULL,
   `image_url` varchar(255) DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `max_concurrent_appointments` int unsigned DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_service_name` (`name`),
-  CONSTRAINT `chk_service_price` CHECK ((`price` > 0))
+  CONSTRAINT `chk_service_price` CHECK ((`price` > 0)),
+  CONSTRAINT `chk_service_capacity` CHECK ((`max_concurrent_appointments` IS NULL OR `max_concurrent_appointments` > 0))
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -442,7 +444,7 @@ CREATE TABLE `services` (
 
 LOCK TABLES `services` WRITE;
 /*!40000 ALTER TABLE `services` DISABLE KEYS */;
-INSERT INTO `services` VALUES (1,'Hair Cut','Professional haircut with wash and styling',45,2500.00,'/uploads/services/83f5dc73-e996-4ed4-9f8c-f1928332c805.webp',1,'2026-08-12 16:43:01','2026-08-17 14:23:51'),(2,'Eye Brows','aa',20,250.00,'/uploads/services/b852082e-4cca-4e59-a9d6-63aab8bed7f1.png',1,'2026-08-18 08:53:26','2026-08-18 08:53:26');
+INSERT INTO `services` VALUES (1,'Hair Cut','Professional haircut with wash and styling',45,2500.00,'/uploads/services/83f5dc73-e996-4ed4-9f8c-f1928332c805.webp',1,NULL,'2026-08-12 16:43:01','2026-08-17 14:23:51'),(2,'Eye Brows','aa',20,250.00,'/uploads/services/b852082e-4cca-4e59-a9d6-63aab8bed7f1.png',1,NULL,'2026-08-18 08:53:26','2026-08-18 08:53:26');
 /*!40000 ALTER TABLE `services` ENABLE KEYS */;
 UNLOCK TABLES;
 

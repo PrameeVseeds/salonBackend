@@ -5,6 +5,7 @@ export interface RegisterServiceInput {
   price: number;
   image_url: string;
   is_active: boolean;
+  max_concurrent_appointments: number | null;
 }
 
 export interface UpdateServiceInput {
@@ -14,5 +15,6 @@ export interface UpdateServiceInput {
   price: number;
   image_url: string;
   is_active: boolean;
+  max_concurrent_appointments: number | null;
 }
 

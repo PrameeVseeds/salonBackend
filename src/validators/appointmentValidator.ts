@@ -33,13 +33,14 @@ export const validateAppointmentId = (value: string | string[] | undefined): Val
 };
 
 export const validateAppointmentRequest = (body: Record<string, unknown>): ValidationResult<AppointmentRequest> => {
-    const employeeId = positiveId(body.employeeId ?? body.employee_id);
+    const employeeValue = body.employeeId ?? body.employee_id;
+    const employeeId = employeeValue === null || employeeValue === undefined || employeeValue === "" ? null : positiveId(employeeValue);
     const serviceId = positiveId(body.serviceId ?? body.service_id);
     const appointmentDate = getString(body.appointmentDate ?? body.appointment_date);
     const startTime = normalizeTime(body.startTime ?? body.start_time);
 
-    if (!employeeId || !serviceId)
-        return { isValid: false, message: "Valid employee and service IDs are required." };
+    if (!serviceId || (employeeValue !== null && employeeValue !== undefined && employeeValue !== "" && !employeeId))
+        return { isValid: false, message: "A valid service ID and optional employee ID are required." };
 
     if (!appointmentDate || !validDate(appointmentDate))
         return { isValid: false, message: "Appointment date must use valid YYYY-MM-DD format." };
@@ -54,18 +55,16 @@ export const validateAppointmentRequest = (body: Record<string, unknown>): Valid
 };
 
 export const validateAvailabilityQuery = (query: Record<string, unknown>): ValidationResult<AvailabilityQuery> => {
-    const result = validateAppointmentRequest({
-        employeeId: query.employeeId,
-        serviceId: query.serviceId,
-        appointmentDate: query.date,
-        startTime: "00:00",
-    });
-    if (!result.isValid)
-        return result;
+    const employeeId = positiveId(query.employeeId);
+    const serviceId = positiveId(query.serviceId);
+    const date = getString(query.date);
+    if (!employeeId || !serviceId)
+        return { isValid: false, message: "Valid employee and service IDs are required." };
+    if (!date || !validDate(date))
+        return { isValid: false, message: "Appointment date must use valid YYYY-MM-DD format." };
 
     return {
-        isValid: true, data:
-            { date: result.data.appointmentDate, serviceId: result.data.serviceId, employeeId: result.data.employeeId }
+        isValid: true, data: { date, serviceId, employeeId }
     };
 };
 

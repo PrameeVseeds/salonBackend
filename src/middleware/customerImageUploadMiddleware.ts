@@ -1,9 +1,11 @@
 import crypto from "node:crypto";
+import { mkdirSync } from "node:fs";
 import path from "node:path";
 import type { Request } from "express";
 import multer from "multer";
 
 const uploadDirectory = path.resolve("uploads/customers");
+mkdirSync(uploadDirectory, { recursive: true });
 
 const storage = multer.diskStorage({destination: (_req, _file, callback) => {
     callback(null, uploadDirectory);
@@ -25,9 +27,7 @@ const allowedMimeTypes = [
 
 const fileFilter: multer.Options["fileFilter"] = (_req: Request,file,callback) => {
   if (!allowedMimeTypes.includes(file.mimetype)) {
-    callback(
-      new Error("Only JPG, PNG and WEBP images are allowed.")
-    );
+    callback(new Error("Unsupported media type."));
     return;
   }
   callback(null, true);

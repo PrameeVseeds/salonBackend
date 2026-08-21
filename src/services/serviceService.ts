@@ -16,6 +16,10 @@ export const createService = async (input: RegisterServiceInput): Promise<Servic
         throw new Error("A service with this name already exists.");
     }
 
+    if (normalizedInput.max_concurrent_appointments !== null) {
+        throw new Error("Use automatic capacity until employees are assigned to the service.");
+    }
+
     return serviceRepository.createService(normalizedInput);
 };
 
@@ -29,6 +33,11 @@ export const updateServiceById = async (serviceId: number,input: UpdateServiceIn
 
     if (await serviceRepository.serviceNameExistsForAnotherService(normalizedInput.name, serviceId)) {
         throw new Error("A service with this name already exists.");
+    }
+
+    const current = await serviceRepository.findServiceById(serviceId);
+    if (normalizedInput.max_concurrent_appointments !== null && normalizedInput.max_concurrent_appointments > Number(current?.assigned_employee_count ?? 0)) {
+        throw new Error("Appointment capacity cannot exceed the number of active employees assigned to this service.");
     }
 
     const updated = await serviceRepository.updateService(serviceId, normalizedInput);

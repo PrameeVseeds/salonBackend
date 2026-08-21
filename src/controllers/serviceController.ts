@@ -38,7 +38,7 @@ export const createService = async (req: Request, res: Response): Promise<void> 
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to create service.";
-        res.status(message.includes("already exists") ? 409 : 500).json({ success: false, message });
+        res.status(message.includes("already exists") ? 409 : message.includes("capacity") ? 400 : 500).json({ success: false, message });
     }
 };
 
@@ -109,7 +109,7 @@ export const updateService = async (req: Request<{ id: string }>,res: Response,)
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to update service.";
-        res.status(message.includes("already exists") ? 409 : 500).json({ success: false, message });
+        res.status(message.includes("already exists") ? 409 : message.includes("capacity") ? 400 : 500).json({ success: false, message });
     }
 };
 
