@@ -28,8 +28,10 @@ export const verifyEmailConnection = async (): Promise<void> => {
 
 export const sendEmail = async (to: string, subject: string, text: string): Promise<void> => {
     await transporter.sendMail(
-        { from: { name: emailFromName, address: emailFromAddress }, 
-        to, subject, text });
+        {
+            from: { name: emailFromName, address: emailFromAddress },
+            to, subject, text
+        });
 };
 
 interface SendPasswordResetEmailInput {
@@ -84,5 +86,28 @@ If you did not request this reset, you can ignore this email.
         </p>
       </div>
     `,
+    });
+};
+
+export const sendAdminPasswordResetEmail = async (input: SendPasswordResetEmailInput): Promise<void> => {
+    await transporter.sendMail({
+        from: { name: emailFromName, address: emailFromAddress },
+        to: input.email,
+        subject: "Reset your salon admin password",
+        text: `Hello ${input.firstName},
+        \n\nReset your admin password using this link: ${input.resetUrl}
+        \n\nThis link expires in ${input.expiresInMinutes} minutes.`,
+        html: `<div style="font-family:Arial,sans-serif;line-height:1.6">
+        <h2>
+        Admin password reset
+        </h2>
+        <p>Hello ${input.firstName},</p>
+        <p>We received a request to reset your admin password.</p>
+        <p>
+        <a href="${input.resetUrl}">Reset your password</a>
+        </p>
+        <p>This link expires in ${input.expiresInMinutes} minutes.</p>
+        <p>If you did not request this, you can ignore this email.</p>
+        </div>`,
     });
 };

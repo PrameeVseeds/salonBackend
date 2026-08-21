@@ -6,6 +6,40 @@ interface ChangePasswordInput {
     newPassword: string;
 }
 
+interface ResetPasswordInput { token: string; newPassword: string; }
+
+export const validateForgotPassword = (body: Record<string, unknown>): ValidationResult<string> => {
+    const email = getString(body.email);
+    return email ? { isValid: true, data: email } :
+        { isValid: false, message: "Email address is required." };
+};
+
+export const validateResetPassword = (body: Record<string, unknown>): ValidationResult<ResetPasswordInput> => {
+    const token = getString(body.token);
+    const newPassword = getString(body.newPassword);
+    const confirmPassword = getString(body.confirmPassword);
+
+    if (!token || !newPassword || !confirmPassword)
+        return {
+            isValid: false,
+            message: "Reset token, new password and confirmation password are required."
+        };
+
+    if (newPassword !== confirmPassword)
+        return {
+            isValid: false,
+            message: "New passwords do not match."
+        };
+
+    if (newPassword.length < 8)
+        return {
+            isValid: false,
+            message: "New password must contain at least 8 characters."
+        };
+
+    return { isValid: true, data: { token, newPassword } };
+};
+
 export const validateLogin = (body: Record<string, unknown>): ValidationResult<LoginRequest> => {
     const email = getString(body.email);
     const password = getString(body.password);

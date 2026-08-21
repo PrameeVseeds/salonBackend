@@ -3,8 +3,10 @@ import type { LoginRequest, UpdateProfileInput } from "../interfaces/authInterfa
 import type { UserRow } from "../models/userModel.js";
 import * as userRepository from "../repositories/userRepository.js";
 import { generateToken } from "../utils/jwtHelper.js";
+import crypto from "node:crypto";
 
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
+const DEFAULT_PASSWORD_RESET_MINUTES = 30;
 
 // Authenticates an active staff user and returns a JWT.
 export const loginUser = async (input: LoginRequest) => {
@@ -94,4 +96,34 @@ export const updateUserProfileById = async (
    });
 
    return updated ? userRepository.findUserProfileById(userId) : null;
+};
+
+export const createUserPasswordResetToken = async (email: string) => {
+   const user = await userRepository.findUserByEmail(normalizeEmail(email));
+
+   if (!user || !user.is_active) 
+      return null;
+
+   const resetToken = crypto.randomBytes(32).toString("hex");
+   const tokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
+   const configured = Number(process.env.PASSWORD_RESET_EXPIRES_MINUTES ?? DEFAULT_PASSWORD_RESET_MINUTES);
+   const expiresInMinutes = Number.isInteger(configured) && configured > 0 ? configured : DEFAULT_PASSWORD_RESET_MINUTES;
+   await userRepository.replacePasswordResetToken(user.id, tokenHash, new Date(Date.now() + expiresInMinutes * 60_000));
+
+   return { 
+      resetToken, 
+      email: user.email, 
+      firstName: user.first_name, 
+      expiresInMinutes 
+   };
+};
+
+export const resetUserPassword = async (resetToken: string, newPassword: string): Promise<boolean> => {
+   const tokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
+   const token = await userRepository.findValidPasswordResetToken(tokenHash);
+   if (!token) 
+      return false;
+   
+   await userRepository.resetPasswordWithToken(token, await bcrypt.hash(newPassword, 12));
+   return true;
 };

@@ -1,7 +1,8 @@
 import type { ResultSetHeader } from "mysql2";
 import { pool } from "../config/db.js";
 import type { UpdateProfileInput } from "../interfaces/authInterface.js";
-import type { UserRow } from "../models/userModel.js";
+import type { UserPasswordResetTokenRow, UserRow } from "../models/userModel.js";
+import type { PoolConnection } from "mysql2/promise";
 
 const userSelectFields = `
     id,
@@ -109,4 +110,54 @@ export const updateUserPasswordHash = async (userId: number, passwordHash: strin
     );
 
     return result.affectedRows > 0;
+};
+
+export const replacePasswordResetToken = async (userId: number, tokenHash: string, expiresAt: Date): Promise<void> => {
+    await pool.execute(
+        `DELETE FROM user_password_reset_tokens 
+        WHERE user_id = ? 
+        OR expires_at < NOW() 
+        OR used_at IS NOT NULL`, [userId]);
+
+    await pool.execute(
+        `INSERT INTO user_password_reset_tokens 
+        (user_id, token_hash, expires_at) 
+        VALUES (?, ?, ?)`,
+         [userId, tokenHash, expiresAt]);
+};
+
+export const findValidPasswordResetToken = async (tokenHash: string): Promise<UserPasswordResetTokenRow | null> => {
+    const [rows] = await pool.execute<UserPasswordResetTokenRow[]>(
+        `SELECT 
+        id, user_id, token_hash, expires_at, used_at 
+        FROM user_password_reset_tokens 
+        WHERE token_hash = ? 
+        AND used_at IS NULL AND expires_at > NOW() 
+        LIMIT 1`,
+        [tokenHash],
+    );
+    return rows[0] ?? null;
+};
+
+export const resetPasswordWithToken = async (token: UserPasswordResetTokenRow, passwordHash: string): Promise<void> => {
+    const connection: PoolConnection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+        await connection.execute(
+            `UPDATE users 
+            SET password_hash = ? 
+            WHERE id = ?`, 
+            [passwordHash, token.user_id]);
+
+        await connection.execute(
+            `UPDATE user_password_reset_tokens 
+            SET used_at = NOW() 
+            WHERE id = ?`, 
+            [token.id]);
+            
+        await connection.commit();
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally { connection.release(); }
 };

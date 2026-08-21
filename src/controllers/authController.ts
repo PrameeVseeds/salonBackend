@@ -1,9 +1,10 @@
 import type { Request, Response } from "express";
-import { changeUserPassword, getUserProfileById, loginUser, updateUserProfileById } from "../services/authService.js";
+import { changeUserPassword, createUserPasswordResetToken, getUserProfileById, loginUser, resetUserPassword, updateUserProfileById } from "../services/authService.js";
 import { AuthenticationRequest } from "../middleware/authMiddleware.js";
 import { formatUserProfile } from "../utils/mappers/userMapper.js";
 import { sendBadRequest } from "../utils/responseHelper.js";
-import { validateChangePassword, validateLogin, validateUpdateProfile } from "../validators/authValidator.js";
+import { validateChangePassword, validateForgotPassword, validateLogin, validateResetPassword, validateUpdateProfile } from "../validators/authValidator.js";
+import { sendAdminPasswordResetEmail } from "../services/emailService.js";
 
 export const login = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -179,6 +180,59 @@ export const changePassword = async (req: AuthenticationRequest, res: Response):
             message,
         });
     }
+};
+
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+    const validation = validateForgotPassword(req.body ?? {});
+    if (!validation.isValid) 
+        return sendBadRequest(res, validation.message);
+
+    try {
+        const result = await createUserPasswordResetToken(validation.data);
+        if (result) {
+            const frontendUrl = process.env.FRONTEND_URL;
+            if (!frontendUrl) 
+                throw new Error("FRONTEND_URL is not configured.");
+            
+            await sendAdminPasswordResetEmail({ 
+                ...result, 
+                resetUrl: `${frontendUrl}/admin/reset-password?token=${encodeURIComponent(result.resetToken)}`
+             });
+        }
+        res.status(200).json({ 
+            success: true, 
+            message: "If an active admin account exists with this email, password reset instructions have been sent." 
+        });
+    } catch (error) {
+        console.error("Admin forgot password error:", error);
+        res.status(500).json({ 
+            success: false, 
+            message: "Failed to process password reset request." 
+        });
+    }
+};
+
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+    const validation = validateResetPassword(req.body ?? {});
+    if (!validation.isValid) 
+        return sendBadRequest(res, validation.message);
+
+    try {
+        if (!(await resetUserPassword(validation.data.token, validation.data.newPassword))) {
+            res.status(400).json({
+                 success: false, 
+                 message: "Reset token is invalid or expired." 
+                });
+            return;
+        }
+        res.status(200).json({ 
+            success: true, 
+            message: "Password reset successfully." 
+        });
+    } catch { res.status(500).json({ 
+        success: false, 
+        message: "Failed to reset password."
+     }); }
 };
 
 export const getSuperAdminDashboard = (req: AuthenticationRequest, res: Response): void =>{

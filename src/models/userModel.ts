@@ -13,3 +13,11 @@ export interface UserRow extends RowDataPacket {
     created_at: Date;
     updated_at: Date;
 }
+
+export interface UserPasswordResetTokenRow extends RowDataPacket {
+    id: number;
+    user_id: number;
+    token_hash: string;
+    expires_at: Date;
+    used_at: Date | null;
+}

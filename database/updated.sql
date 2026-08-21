@@ -32,6 +32,11 @@ CREATE TABLE `appointments` (
   `end_time` time NOT NULL,
   `total_amount` decimal(10,2) NOT NULL,
   `notes` text,
+  `status` enum('Scheduled','In Progress','Completed','Cancelled') COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT 'Scheduled',
+  `started_at` datetime DEFAULT NULL,
+  `completed_at` datetime DEFAULT NULL,
+  `cancelled_at` datetime DEFAULT NULL,
+  `cancellation_reason` varchar(255) COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -40,6 +45,7 @@ CREATE TABLE `appointments` (
   KEY `idx_appointments_service_id` (`service_id`),
   KEY `idx_appointments_date` (`appointment_date`),
   KEY `idx_appointments_employee_schedule` (`employee_id`,`appointment_date`,`start_time`,`end_time`),
+  KEY `idx_appointments_auto_cancellation` (`status`,`appointment_date`,`start_time`),
   CONSTRAINT `fk_appointments_customer` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`),
   CONSTRAINT `fk_appointments_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`),
   CONSTRAINT `fk_appointments_service` FOREIGN KEY (`service_id`) REFERENCES `services` (`id`),
@@ -393,7 +399,7 @@ CREATE TABLE `salon_working_hours` (
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_salon_working_hours_day` (`day_of_week`),
-  CONSTRAINT `chk_salon_working_hours` CHECK ((((`is_closed` = true) and (`opening_time` is null) and (`closing_time` is null)) or ((`is_closed` = false) and (`opening_time` is not null) and (`closing_time` is not null) and (`closing_time` > `opening_time`))))
+  CONSTRAINT `chk_salon_working_hours` CHECK (((`is_closed` = true) or ((`opening_time` is not null) and (`closing_time` is not null) and (`closing_time` > `opening_time`))))
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -461,10 +467,12 @@ CREATE TABLE `settings` (
   `enable_online_payment` tinyint(1) NOT NULL DEFAULT '0',
   `booking_interval_minutes` int unsigned NOT NULL DEFAULT '30',
   `appointment_buffer_minutes` int unsigned NOT NULL DEFAULT '0',
+  `appointment_grace_period_minutes` int unsigned NOT NULL DEFAULT '15',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   CONSTRAINT `chk_appointment_buffer` CHECK ((`appointment_buffer_minutes` >= 0)),
+  CONSTRAINT `chk_appointment_grace_period` CHECK ((`appointment_grace_period_minutes` >= 0)),
   CONSTRAINT `chk_booking_interval` CHECK ((`booking_interval_minutes` > 0))
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -475,7 +483,7 @@ CREATE TABLE `settings` (
 
 LOCK TABLES `settings` WRITE;
 /*!40000 ALTER TABLE `settings` DISABLE KEYS */;
-INSERT INTO `settings` VALUES (1,'Salon','0706550713','admin@salon.com','Wasana\nKirinda','/uploads/settings/54dbf260-9cac-44b0-951e-e2deb7269fb8.png',NULL,NULL,NULL,1,0,30,0,'2026-08-17 13:51:19','2026-08-17 14:42:29');
+INSERT INTO `settings` VALUES (1,'Salon','0706550713','admin@salon.com','Wasana\nKirinda','/uploads/settings/54dbf260-9cac-44b0-951e-e2deb7269fb8.png',NULL,NULL,NULL,1,0,30,0,15,'2026-08-17 13:51:19','2026-08-17 14:42:29');
 /*!40000 ALTER TABLE `settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
