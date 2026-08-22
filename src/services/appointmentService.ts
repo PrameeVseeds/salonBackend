@@ -107,13 +107,13 @@ export const getAvailability = async (
   const closing = toMinutes(context.workingDay.closing_time);
   const duration = Number(context.service.duration_minutes);
   const buffer = Number(scheduling.appointment_buffer_minutes);
-  const interval = Number(scheduling.booking_interval_minutes);
+  const slotStep = duration + buffer;
   const slots: string[] = [];
 
   for (
     let start = opening;
     start + duration + buffer <= closing;
-    start += interval
+    start += slotStep
   ) {
     const serviceBookings = context.serviceAppointments.filter((range) =>
       overlaps(start, start + duration + buffer, range),
@@ -161,8 +161,9 @@ const saveAppointment = async (customerId: number, input: AppointmentRequest, ap
       const end = start + Number(context.service.duration_minutes);
       const bufferedEnd = end + Number(scheduling.appointment_buffer_minutes);
       const opening = toMinutes(context.workingDay.opening_time);
+      const slotStep = Number(context.service.duration_minutes) + Number(scheduling.appointment_buffer_minutes);
       const unavailable = start < opening ||
-        (start - opening) % Number(scheduling.booking_interval_minutes) !== 0 ||
+        (start - opening) % slotStep !== 0 ||
         bufferedEnd > toMinutes(context.workingDay.closing_time) ||
         context.blocked.some((range) => overlaps(start, bufferedEnd, range)) ||
         context.capacity <= 0 ||
