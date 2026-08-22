@@ -55,11 +55,12 @@ export const validateAppointmentRequest = (body: Record<string, unknown>): Valid
 };
 
 export const validateAvailabilityQuery = (query: Record<string, unknown>): ValidationResult<AvailabilityQuery> => {
-    const employeeId = positiveId(query.employeeId);
+    const employeeValue = query.employeeId;
+    const employeeId = employeeValue === undefined || employeeValue === null || employeeValue === "" ? null : positiveId(employeeValue);
     const serviceId = positiveId(query.serviceId);
     const date = getString(query.date);
-    if (!employeeId || !serviceId)
-        return { isValid: false, message: "Valid employee and service IDs are required." };
+    if (!serviceId || (employeeValue !== undefined && employeeValue !== null && employeeValue !== "" && !employeeId))
+        return { isValid: false, message: "A valid service ID and optional employee ID are required." };
     if (!date || !validDate(date))
         return { isValid: false, message: "Appointment date must use valid YYYY-MM-DD format." };
 

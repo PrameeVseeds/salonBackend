@@ -33,7 +33,7 @@ const getScheduleContext = async (query: AvailabilityQuery,excludeAppointmentId?
 
   if (!selectedService) throw new Error("Service not found or inactive.");
 
-  if (
+  if (query.employeeId !== null &&
     !(await repository.employeeOffersService(
       query.employeeId,
       query.serviceId,
@@ -51,10 +51,12 @@ const getScheduleContext = async (query: AvailabilityQuery,excludeAppointmentId?
       blocked: [],
       serviceAppointments: [],
       capacity: 0,
+      unavailableReason: "The salon is closed on this date.",
     };
   }
 
-  const workingDay = await repository.findWorkingDay(weekday(query.date), db);
+  const dayOfWeek = weekday(query.date);
+  const workingDay = await repository.findWorkingDay(dayOfWeek, db);
   if (!workingDay || workingDay.is_closed)
     return {
       service: selectedService,
@@ -63,40 +65,43 @@ const getScheduleContext = async (query: AvailabilityQuery,excludeAppointmentId?
       blocked: [],
       serviceAppointments: [],
       capacity: 0,
+      unavailableReason: !workingDay
+        ? `The salon has no working hours configured for ${dayOfWeek}.`
+        : `The salon is closed on ${dayOfWeek}.`,
     };
 
   const [breaks, leaves, appointments, serviceAppointments, assignedEmployeeCount] = await Promise.all([
     repository.findBusinessBreaks(query.date, db),
+    query.employeeId === null ? Promise.resolve([]) : 
     repository.findApprovedEmployeeLeaves(query.employeeId, query.date, db),
-    repository.findAppointmentTimeRanges(
-      query.employeeId,
-      query.date,
-      excludeAppointmentId,
-      db,
-    ),
+    query.employeeId === null ? Promise.resolve([]) : 
+    repository.findAppointmentTimeRanges(query.employeeId, query.date, excludeAppointmentId, db),
     repository.findServiceAppointmentTimeRanges(query.serviceId, query.date, excludeAppointmentId, db),
     repository.countActiveEmployeesForService(query.serviceId, db),
   ]);
   const configuredCapacity = selectedService.max_concurrent_appointments;
+  const staffingCapacity = Math.max(assignedEmployeeCount, 1);
   return {
     service: selectedService,
     unavailable: false,
     workingDay,
     blocked: [...breaks, ...leaves, ...appointments],
     serviceAppointments,
-    capacity: Math.min(configuredCapacity ?? assignedEmployeeCount, assignedEmployeeCount),
+    capacity: Math.min(configuredCapacity ?? staffingCapacity, staffingCapacity),
+    unavailableReason: null,
   };
 };
 
-export const getAvailableSlots = async (
+export const getAvailability = async (
   query: AvailabilityQuery,
-): Promise<string[]> => {
+): Promise<{ slots: string[]; message: string | null }> => {
   const [context, scheduling] = await Promise.all([
     getScheduleContext(query),
     repository.findSchedulingSettings(),
   ]);
 
-  if (context.unavailable || !context.workingDay) return [];
+  if (context.unavailable || !context.workingDay)
+    return { slots: [], message: context.unavailableReason ?? "The salon is unavailable on this date." };
 
   const opening = toMinutes(context.workingDay.opening_time);
   const closing = toMinutes(context.workingDay.closing_time);
@@ -117,8 +122,14 @@ export const getAvailableSlots = async (
       !context.blocked.some((range) => overlaps(start, start + duration + buffer, range)))
       slots.push(toTime(start));
   }
-  return slots;
+  return {
+    slots,
+    message: slots.length ? null : "All appointment times are booked for this date.",
+  };
 };
+
+export const getAvailableSlots = async (query: AvailabilityQuery): Promise<string[]> =>
+  (await getAvailability(query)).slots;
 
 const saveAppointment = async (customerId: number, input: AppointmentRequest, appointmentId?: number): Promise<AppointmentRow> => {
   const id = await repository.withTransaction(async (connection) => {
@@ -134,16 +145,17 @@ const saveAppointment = async (customerId: number, input: AppointmentRequest, ap
     if (!(await repository.lockService(connection, input.serviceId)))
       throw new Error("Service not found or inactive.");
 
-    const candidates = input.employeeId
+    const assignedCandidates = input.employeeId
       ? [input.employeeId]
       : await repository.findActiveEmployeeIdsForService(input.serviceId, connection);
+    const candidates: Array<number | null> = assignedCandidates.length ? assignedCandidates : [null];
     const scheduling = await repository.findSchedulingSettings(connection);
     const start = toMinutes(input.startTime);
     let selectedEmployeeId: number | null = null;
     let selectedContext: appointmentInterface.AppointmentScheduleContext | null = null;
 
     for (const candidateId of candidates) {
-      if (!(await repository.lockEmployee(connection, candidateId))) continue;
+      if (candidateId !== null && !(await repository.lockEmployee(connection, candidateId))) continue;
       const context = await getScheduleContext({ date: input.appointmentDate, serviceId: input.serviceId, employeeId: candidateId }, appointmentId, connection);
       if (context.unavailable || !context.workingDay) continue;
       const end = start + Number(context.service.duration_minutes);
@@ -162,7 +174,7 @@ const saveAppointment = async (customerId: number, input: AppointmentRequest, ap
       }
     }
 
-    if (!selectedEmployeeId || !selectedContext)
+    if (!selectedContext)
       throw new Error("The selected appointment slot is no longer available.");
 
     const end = start + Number(selectedContext.service.duration_minutes);
@@ -248,5 +260,13 @@ export const cancelAppointment = async (id: number, reason: string): Promise<App
   if (!appointment) 
     throw new Error("Appointment not found.");
   
+  return appointment;
+};
+
+export const cancelCustomerAppointment = async (id: number, customerId: number, reason: string): Promise<AppointmentRow> => {
+  if (!(await repository.cancelOwned(id, customerId, reason)))
+    throw new Error("Only your scheduled appointments can be cancelled.");
+  const appointment = await repository.findOwnedById(id, customerId);
+  if (!appointment) throw new Error("Appointment not found.");
   return appointment;
 };

@@ -22,7 +22,7 @@ export const availableSlots = async (req: Request, res: Response): Promise<void>
         return sendBadRequest(res, validation.message);
 
     try {
-        const slots = await service.getAvailableSlots(validation.data);
+        const availability = await service.getAvailability(validation.data);
         res.status(200).json(
             {
                 success: true, message: "Available slots retrieved successfully.",
@@ -30,7 +30,8 @@ export const availableSlots = async (req: Request, res: Response): Promise<void>
                     date: validation.data.date,
                     employeeId: validation.data.employeeId,
                     serviceId: validation.data.serviceId,
-                    slots
+                    slots: availability.slots,
+                    availabilityMessage: availability.message,
                 }
             }
         );
@@ -210,5 +211,21 @@ export const cancel = async (req: Request<{ id: string }>, res: Response): Promi
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to cancel appointment.";
         res.status(message.includes("Only") ? 409 : 500).json({ success: false, message });
+    }
+};
+
+export const cancelOwned = async (req: CustomerAuthRequest, res: Response): Promise<void> => {
+    const validation = validateAppointmentId(req.params.id);
+    if (!validation.isValid) 
+        return sendBadRequest(res, validation.message);
+
+    const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "Cancelled by customer";
+    if (reason.length > 255) 
+        return sendBadRequest(res, "Cancellation reason must not exceed 255 characters.");
+    try {
+        const appointment = await service.cancelCustomerAppointment(validation.data, customerId(req), reason || "Cancelled by customer");
+        res.status(200).json({ success: true, message: "Appointment cancelled successfully.", data: { appointment: formatAppointment(appointment) } });
+    } catch (error) {
+        errorResponse(res, error, "Failed to cancel appointment.");
     }
 };

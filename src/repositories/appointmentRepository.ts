@@ -7,6 +7,11 @@ import type { AppointmentRow } from "../models/appointmentModel.js";
 const fields =`id, customer_id, employee_id, service_id, appointment_date, 
 start_time, end_time, total_amount, notes, status, started_at, completed_at,
 cancelled_at, cancellation_reason, created_at, updated_at`;
+const customerDetailFields = `a.id, a.customer_id, a.employee_id, a.service_id, a.appointment_date,
+  a.start_time, a.end_time, a.total_amount, a.notes, a.status, a.started_at, a.completed_at,
+  a.cancelled_at, a.cancellation_reason, a.created_at, a.updated_at,
+  CASE WHEN e.id IS NULL THEN NULL ELSE CONCAT(e.first_name, ' ', e.last_name) END AS employee_name,
+  s.name AS service_name, s.duration_minutes AS service_duration_minutes`;
 
 export const findActiveService = async (
   serviceId: number,
@@ -189,9 +194,11 @@ export const findSchedulingSettings = async (
 
 export const findById = async (id: number): Promise<AppointmentRow | null> => {
   const [rows] = await pool.execute<AppointmentRow[]>(
-    `SELECT ${fields} 
-        FROM appointments 
-        WHERE id = ? 
+    `SELECT ${customerDetailFields}
+        FROM appointments a
+        LEFT JOIN employees e ON e.id = a.employee_id
+        INNER JOIN services s ON s.id = a.service_id
+        WHERE a.id = ?
         LIMIT 1`, [id]);
   return rows[0] ?? null;
 };
@@ -199,19 +206,23 @@ export const findById = async (id: number): Promise<AppointmentRow | null> => {
 export const findOwnedById = async (id: number, customerId: number): Promise<AppointmentRow | null> => {
   const [rows] = await pool.execute<AppointmentRow[]>
   (
-    `SELECT ${fields} 
-        FROM appointments 
-        WHERE id = ? AND customer_id = ? 
+    `SELECT ${customerDetailFields}
+        FROM appointments a
+        LEFT JOIN employees e ON e.id = a.employee_id
+        INNER JOIN services s ON s.id = a.service_id
+        WHERE a.id = ? AND a.customer_id = ?
         LIMIT 1`, [id, customerId]);
   return rows[0] ?? null;
 };
 
 export const findByCustomer = async (customerId: number,): Promise<AppointmentRow[]> => {
   const [rows] = await pool.execute<AppointmentRow[]>(
-    `SELECT ${fields} 
-        FROM appointments 
-        WHERE customer_id = ? 
-        ORDER BY appointment_date DESC, start_time DESC`,
+    `SELECT ${customerDetailFields}
+        FROM appointments a
+        LEFT JOIN employees e ON e.id = a.employee_id
+        INNER JOIN services s ON s.id = a.service_id
+        WHERE a.customer_id = ?
+        ORDER BY a.appointment_date DESC, a.start_time DESC`,
     [customerId],
   );
   return rows;
@@ -318,7 +329,7 @@ export const insert = async (
   connection: PoolConnection,
   values: {
     customerId: number;
-    employeeId: number;
+    employeeId: number | null;
     serviceId: number;
     date: string;
     startTime: string;
@@ -350,7 +361,7 @@ export const updateOwned = async (
   id: number,
   customerId: number,
   values: {
-    employeeId: number;
+    employeeId: number | null;
     serviceId: number;
     date: string;
     startTime: string;
@@ -422,6 +433,16 @@ export const cancel = async (id: number, reason: string): Promise<boolean> => {
         SET status = 'Cancelled', cancelled_at = CURRENT_TIMESTAMP, cancellation_reason = ?
       WHERE id = ? AND status IN ('Scheduled', 'In Progress')`,
     [reason, id],
+  );
+  return result.affectedRows > 0;
+};
+
+export const cancelOwned = async (id: number, customerId: number, reason: string): Promise<boolean> => {
+  const [result] = await pool.execute<ResultSetHeader>(
+    `UPDATE appointments
+        SET status = 'Cancelled', cancelled_at = CURRENT_TIMESTAMP, cancellation_reason = ?
+      WHERE id = ? AND customer_id = ? AND status = 'Scheduled'`,
+    [reason, id, customerId],
   );
   return result.affectedRows > 0;
 };

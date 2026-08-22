@@ -17,5 +17,5 @@ export interface AppointmentFilters {
 export interface AvailabilityQuery {
     date: string;
     serviceId: number;
-    employeeId: number;
+    employeeId: number | null;
 }

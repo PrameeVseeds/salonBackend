@@ -28,6 +28,7 @@ export interface AppointmentScheduleContext {
   blocked: AppointmentTimeRange[];
   serviceAppointments: AppointmentTimeRange[];
   capacity: number;
+  unavailableReason: string | null;
 }
 
 export interface AppointmentSchedulingSettings extends RowDataPacket {

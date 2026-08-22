@@ -197,7 +197,7 @@ DROP TABLE IF EXISTS `employee_leaves`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `employee_leaves` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `employee_id` bigint unsigned NOT NULL,
+  `employee_id` bigint unsigned DEFAULT NULL,
   `leave_type` varchar(100) NOT NULL,
   `leave_date` date NOT NULL,
   `start_time` time NOT NULL,
