@@ -2,7 +2,7 @@ import type {AppointmentFilters, AppointmentRequest, AvailabilityQuery} from "..
 import * as appointmentInterface from "../interfaces/appointmentServiceInterface.js";
 import type { AppointmentRow } from "../models/appointmentModel.js";
 import * as repository from "../repositories/appointmentRepository.js";
-import { createAppointmentConfirmation } from "./notificationService.js";
+import { createAppointmentCancellation, createAppointmentCompletion, createAppointmentConfirmation } from "./notificationService.js";
 
 const toMinutes = (time: string): number => {
   const [hours = 0, minutes = 0] = time.split(":").map(Number);
@@ -95,9 +95,12 @@ const getScheduleContext = async (query: AvailabilityQuery,excludeAppointmentId?
 export const getAvailability = async (
   query: AvailabilityQuery,
 ): Promise<{ slots: string[]; message: string | null }> => {
-  const [context, scheduling] = await Promise.all([
+  const [context, scheduling, assignedEmployeeIds] = await Promise.all([
     getScheduleContext(query),
     repository.findSchedulingSettings(),
+    query.employeeId === null
+      ? repository.findActiveEmployeeIdsForService(query.serviceId)
+      : Promise.resolve([query.employeeId]),
   ]);
 
   if (context.unavailable || !context.workingDay)
@@ -109,6 +112,13 @@ export const getAvailability = async (
   const buffer = Number(scheduling.appointment_buffer_minutes);
   const slotStep = duration + buffer;
   const slots: string[] = [];
+  const employeeContexts = assignedEmployeeIds.length
+    ? await Promise.all(
+        assignedEmployeeIds.map((employeeId) =>
+          getScheduleContext({ ...query, employeeId }),
+        ),
+      )
+    : [];
 
   for (
     let start = opening;
@@ -118,8 +128,23 @@ export const getAvailability = async (
     const serviceBookings = context.serviceAppointments.filter((range) =>
       overlaps(start, start + duration + buffer, range),
     ).length;
-    if (context.capacity > 0 && serviceBookings < context.capacity &&
-      !context.blocked.some((range) => overlaps(start, start + duration + buffer, range)))
+    const salonIsAvailable = !context.blocked.some((range) =>
+      overlaps(start, start + duration + buffer, range),
+    );
+    const professionalIsAvailable = employeeContexts.length === 0
+      ? true
+      : employeeContexts.some((employeeContext) =>
+          !employeeContext.unavailable &&
+          !employeeContext.blocked.some((range) =>
+            overlaps(start, start + duration + buffer, range),
+          ),
+        );
+    if (
+      context.capacity > 0 &&
+      serviceBookings < context.capacity &&
+      salonIsAvailable &&
+      professionalIsAvailable
+    )
       slots.push(toTime(start));
   }
   return {
@@ -230,8 +255,8 @@ export const getAllAppointments = (filters: AppointmentFilters) =>
   repository.findAll(filters);
 
 export const startAppointment = async (id: number): Promise<AppointmentRow> => {
-  if (!(await repository.updateStatus(id, "Scheduled", "In Progress")))
-    throw new Error("Only a scheduled appointment can be started.");
+  if (!(await repository.startWithinScheduledWindow(id)))
+    throw new Error("Only scheduled appointments within their appointment time can be started.");
 
   const appointment = await repository.findById(id);
   if (!appointment) 
@@ -248,10 +273,36 @@ export const completeAppointment = async (id: number): Promise<AppointmentRow> =
   if (!appointment) 
     throw new Error("Appointment not found.");
 
+  await createAppointmentCompletion(appointment).catch((error) =>
+    console.error("Failed to create appointment completion notification:", error),
+  );
+
   return appointment;
 };
 
-export const cancelOverdueAppointments = () => repository.cancelOverdue();
+export const processTimedAppointmentStatuses = async (): Promise<void> => {
+  const overdue = await repository.findOverdueScheduled();
+  for (const appointment of overdue) {
+    if (await repository.cancelScheduledAsOverdue(appointment.id)) {
+      const cancelled = await repository.findById(appointment.id);
+      if (cancelled) await createAppointmentCancellation(cancelled).catch((error) =>
+        console.error(`Failed to notify cancellation for appointment ${appointment.id}:`, error),
+      );
+    }
+  }
+
+  const dueForCompletion = await repository.findDueInProgress();
+  for (const appointment of dueForCompletion) {
+    if (await repository.updateStatus(appointment.id, "In Progress", "Completed")) {
+      const completed = await repository.findById(appointment.id);
+      if (completed) await createAppointmentCompletion(completed).catch((error) =>
+        console.error(`Failed to notify completion for appointment ${appointment.id}:`, error),
+      );
+    }
+  }
+};
+
+export const cancelOverdueAppointments = processTimedAppointmentStatuses;
 
 export const cancelAppointment = async (id: number, reason: string): Promise<AppointmentRow> => {
   if (!(await repository.cancel(id, reason)))

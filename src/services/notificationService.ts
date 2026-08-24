@@ -32,6 +32,35 @@ export const createAppointmentConfirmation = async (appointment: AppointmentRow)
     if (notification) await deliverNotification(notification);
 };
 
+const createAppointmentStatusNotification = async (
+    appointment: AppointmentRow,
+    title: string,
+    message: string,
+): Promise<void> => {
+    const notification = await repository.create({
+        appointmentId: appointment.id,
+        customerId: appointment.customer_id,
+        type: "Email",
+        title,
+        message,
+    });
+    if (notification) await deliverNotification(notification);
+};
+
+export const createAppointmentCancellation = (appointment: AppointmentRow): Promise<void> =>
+    createAppointmentStatusNotification(
+        appointment,
+        "Appointment Cancelled",
+        `Your appointment for ${appointment.appointment_date} at ${appointment.start_time} was automatically cancelled because it was not started within the allowed grace period.`,
+    );
+
+export const createAppointmentCompletion = (appointment: AppointmentRow): Promise<void> =>
+    createAppointmentStatusNotification(
+        appointment,
+        "Appointment Completed",
+        `Your appointment for ${appointment.appointment_date} at ${appointment.start_time} has been completed. Thank you for visiting us.`,
+    );
+
 export const getNotifications = (filters: NotificationFilters) => repository.findAll(filters);
 
 export const getNotification = (id: number) => repository.findById(id);

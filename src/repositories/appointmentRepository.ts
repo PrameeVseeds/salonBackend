@@ -413,18 +413,55 @@ export const updateStatus = async (id: number,fromStatus: AppointmentRow["status
   return result.affectedRows > 0;
 };
 
-export const cancelOverdue = async (): Promise<number> => {
+export const startWithinScheduledWindow = async (id: number): Promise<boolean> => {
   const [result] = await pool.execute<ResultSetHeader>(
-    `UPDATE appointments a
-       JOIN settings s ON s.id = 1
-        SET a.status = 'Cancelled',
-            a.cancelled_at = CURRENT_TIMESTAMP,
-            a.cancellation_reason = 'Customer did not arrive within the configured grace period.'
+    `UPDATE appointments
+        SET status = 'In Progress', started_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+        AND status = 'Scheduled'
+        AND CURRENT_TIMESTAMP BETWEEN
+            TIMESTAMP(appointment_date, start_time)
+            AND TIMESTAMP(appointment_date, end_time)`,
+    [id],
+  );
+  return result.affectedRows > 0;
+};
+
+export const findOverdueScheduled = async (): Promise<AppointmentRow[]> => {
+  const [rows] = await pool.execute<AppointmentRow[]>(
+    `SELECT ${customerDetailFields}
+       FROM appointments a
+       LEFT JOIN employees e ON e.id = a.employee_id
+       INNER JOIN services s ON s.id = a.service_id
+       INNER JOIN settings settings_row ON settings_row.id = 1
       WHERE a.status = 'Scheduled'
         AND TIMESTAMP(a.appointment_date, a.start_time)
-            + INTERVAL s.appointment_grace_period_minutes MINUTE <= CURRENT_TIMESTAMP`,
+            + INTERVAL settings_row.appointment_grace_period_minutes MINUTE <= CURRENT_TIMESTAMP`,
   );
-  return result.affectedRows;
+  return rows;
+};
+
+export const findDueInProgress = async (): Promise<AppointmentRow[]> => {
+  const [rows] = await pool.execute<AppointmentRow[]>(
+    `SELECT ${customerDetailFields}
+       FROM appointments a
+       LEFT JOIN employees e ON e.id = a.employee_id
+       INNER JOIN services s ON s.id = a.service_id
+      WHERE a.status = 'In Progress'
+        AND a.started_at + INTERVAL s.duration_minutes MINUTE <= CURRENT_TIMESTAMP`,
+  );
+  return rows;
+};
+
+export const cancelScheduledAsOverdue = async (id: number): Promise<boolean> => {
+  const [result] = await pool.execute<ResultSetHeader>(
+    `UPDATE appointments
+        SET status = 'Cancelled', cancelled_at = CURRENT_TIMESTAMP,
+            cancellation_reason = 'Customer did not arrive within the configured grace period.'
+      WHERE id = ? AND status = 'Scheduled'`,
+    [id],
+  );
+  return result.affectedRows > 0;
 };
 
 export const cancel = async (id: number, reason: string): Promise<boolean> => {

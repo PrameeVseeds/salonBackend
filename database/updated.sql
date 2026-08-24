@@ -469,7 +469,7 @@ CREATE TABLE `settings` (
   `enable_online_payment` tinyint(1) NOT NULL DEFAULT '0',
   `booking_interval_minutes` int unsigned NOT NULL DEFAULT '30',
   `appointment_buffer_minutes` int unsigned NOT NULL DEFAULT '0',
-  `appointment_grace_period_minutes` int unsigned NOT NULL DEFAULT '15',
+  `appointment_grace_period_minutes` int unsigned NOT NULL DEFAULT '5',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -485,7 +485,7 @@ CREATE TABLE `settings` (
 
 LOCK TABLES `settings` WRITE;
 /*!40000 ALTER TABLE `settings` DISABLE KEYS */;
-INSERT INTO `settings` VALUES (1,'Salon','0706550713','admin@salon.com','Wasana\nKirinda','/uploads/settings/54dbf260-9cac-44b0-951e-e2deb7269fb8.png',NULL,NULL,NULL,1,0,30,0,15,'2026-08-17 13:51:19','2026-08-17 14:42:29');
+INSERT INTO `settings` VALUES (1,'Salon','0706550713','admin@salon.com','Wasana\nKirinda','/uploads/settings/54dbf260-9cac-44b0-951e-e2deb7269fb8.png',NULL,NULL,NULL,1,0,30,0,5,'2026-08-17 13:51:19','2026-08-17 14:42:29');
 /*!40000 ALTER TABLE `settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
