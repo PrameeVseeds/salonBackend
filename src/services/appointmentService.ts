@@ -92,7 +92,7 @@ const getScheduleContext = async (query: AvailabilityQuery,excludeAppointmentId?
     repository.countActiveEmployeesForService(query.serviceId, db),
   ]);
   const configuredCapacity = selectedService.max_concurrent_appointments;
-  const staffingCapacity = Math.max(assignedEmployeeCount, 1);
+  const staffingCapacity = assignedEmployeeCount;
   return {
     service: selectedService,
     unavailable: false,
