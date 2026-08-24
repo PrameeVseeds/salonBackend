@@ -2,7 +2,7 @@ import type {AppointmentFilters, AppointmentRequest, AvailabilityQuery} from "..
 import * as appointmentInterface from "../interfaces/appointmentServiceInterface.js";
 import type { AppointmentRow } from "../models/appointmentModel.js";
 import * as repository from "../repositories/appointmentRepository.js";
-import { createAppointmentCancellation, createAppointmentCompletion, createAppointmentConfirmation } from "./notificationService.js";
+import { createAppointmentCancellation, createAppointmentCompletion, createAppointmentConfirmation, createAppointmentReminder, createAppointmentStarted } from "./notificationService.js";
 
 const toMinutes = (time: string): number => {
   const [hours = 0, minutes = 0] = time.split(":").map(Number);
@@ -262,6 +262,10 @@ export const startAppointment = async (id: number): Promise<AppointmentRow> => {
   if (!appointment) 
     throw new Error("Appointment not found.");
 
+  await createAppointmentStarted(appointment).catch((error) =>
+    console.error("Failed to create appointment start notification:", error),
+  );
+
   return appointment;
 };
 
@@ -281,6 +285,13 @@ export const completeAppointment = async (id: number): Promise<AppointmentRow> =
 };
 
 export const processTimedAppointmentStatuses = async (): Promise<void> => {
+  const dueReminders = await repository.findDueReminders();
+  for (const appointment of dueReminders) {
+    await createAppointmentReminder(appointment).catch((error) =>
+      console.error(`Failed to send reminder for appointment ${appointment.id}:`, error),
+    );
+  }
+
   const overdue = await repository.findOverdueScheduled();
   for (const appointment of overdue) {
     if (await repository.cancelScheduledAsOverdue(appointment.id)) {

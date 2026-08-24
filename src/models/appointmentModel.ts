@@ -21,6 +21,8 @@ export interface AppointmentRow extends RowDataPacket {
     employee_name?: string | null;
     service_name?: string;
     service_duration_minutes?: number;
+    employee_email?: string | null;
+    admin_email?: string;
     created_at: Date;
     updated_at: Date;
 }

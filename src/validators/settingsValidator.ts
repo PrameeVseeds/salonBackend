@@ -35,6 +35,10 @@ export const validateSettings = (body: Record<string, unknown>,): ValidationResu
     body.appointmentGracePeriodMinutes ?? body.appointment_grace_period_minutes,
     false,
   );
+  const appointmentReminderMinutes = getInteger(
+    body.appointmentReminderMinutes ?? body.appointment_reminder_minutes,
+    false,
+  );
   if (!salonName || !phone || !email || !address)
     return {
       isValid: false,
@@ -60,6 +64,11 @@ export const validateSettings = (body: Record<string, unknown>,): ValidationResu
       isValid: false,
       message: "Appointment grace period must be a non-negative whole number.",
     };
+  if (appointmentReminderMinutes === null)
+    return {
+      isValid: false,
+      message: "Appointment reminder time must be a non-negative whole number.",
+    };
   return {
     isValid: true,
     data: {
@@ -75,6 +84,7 @@ export const validateSettings = (body: Record<string, unknown>,): ValidationResu
       booking_interval_minutes: bookingIntervalMinutes,
       appointment_buffer_minutes: appointmentBufferMinutes,
       appointment_grace_period_minutes: appointmentGracePeriodMinutes,
+      appointment_reminder_minutes: appointmentReminderMinutes,
     },
   };
 };

@@ -11,4 +11,5 @@ export interface SettingsInput {
   booking_interval_minutes: number;
   appointment_buffer_minutes: number;
   appointment_grace_period_minutes: number;
+  appointment_reminder_minutes: number;
 }

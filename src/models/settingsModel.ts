@@ -15,6 +15,7 @@ export interface SettingsRow extends RowDataPacket {
   booking_interval_minutes: number;
   appointment_buffer_minutes: number;
   appointment_grace_period_minutes: number;
+  appointment_reminder_minutes: number;
   created_at: Date;
   updated_at: Date;
 }

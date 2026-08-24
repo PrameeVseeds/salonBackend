@@ -441,6 +441,27 @@ export const findOverdueScheduled = async (): Promise<AppointmentRow[]> => {
   return rows;
 };
 
+export const findDueReminders = async (): Promise<AppointmentRow[]> => {
+  const [rows] = await pool.execute<AppointmentRow[]>(
+    `SELECT ${customerDetailFields}, e.email AS employee_email,
+            settings_row.email AS admin_email
+       FROM appointments a
+       LEFT JOIN employees e ON e.id = a.employee_id
+       INNER JOIN services s ON s.id = a.service_id
+       INNER JOIN settings settings_row ON settings_row.id = 1
+      WHERE a.status = 'Scheduled'
+        AND TIMESTAMP(a.appointment_date, a.start_time) > CURRENT_TIMESTAMP
+        AND TIMESTAMP(a.appointment_date, a.start_time)
+            - INTERVAL settings_row.appointment_reminder_minutes MINUTE <= CURRENT_TIMESTAMP
+        AND NOT EXISTS (
+          SELECT 1 FROM notifications n
+           WHERE n.appointment_id = a.id
+             AND n.title = 'Appointment Reminder'
+        )`,
+  );
+  return rows;
+};
+
 export const findDueInProgress = async (): Promise<AppointmentRow[]> => {
   const [rows] = await pool.execute<AppointmentRow[]>(
     `SELECT ${customerDetailFields}
