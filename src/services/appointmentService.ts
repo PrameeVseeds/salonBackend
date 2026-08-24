@@ -290,6 +290,28 @@ export const assignEmployeeToAppointment = async (id: number, employeeId: number
   return updated;
 };
 
+export const getAvailableEmployeeIdsForAppointment = async (id: number): Promise<number[]> => {
+  const appointment = await repository.findById(id);
+  if (!appointment) 
+    throw new Error("Appointment not found.");
+  
+  const date = toDateKey(appointment.appointment_date);
+  const start = toMinutes(appointment.start_time);
+  const end = toMinutes(appointment.end_time);
+  const employeeIds = await repository.findActiveEmployeeIdsForService(appointment.service_id);
+  const availability = await Promise.all(employeeIds.map(async (employeeId) => {
+    const context = await getScheduleContext({
+      date,
+      serviceId: appointment.service_id,
+      employeeId,
+    }, appointment.id);
+    return !context.unavailable && !context.blocked.some((range) => overlaps(start, end, range))
+      ? employeeId
+      : null;
+  }));
+  return availability.filter((employeeId): employeeId is number => employeeId !== null);
+};
+
 export const startAppointment = async (id: number): Promise<AppointmentRow> => {
   if (!(await repository.startWithinScheduledWindow(id)))
     throw new Error("Only scheduled appointments within their appointment time can be started.");

@@ -215,6 +215,23 @@ export const assignEmployee = async (req: Request<{ id: string }>, res: Response
     }
 };
 
+export const availableEmployees = async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+    const validation = validateAppointmentId(req.params.id);
+    if (!validation.isValid) 
+        return sendBadRequest(res, validation.message);
+    try {
+        const employeeIds = await service.getAvailableEmployeeIdsForAppointment(validation.data);
+        res.status(200).json({
+            success: true,
+            message: "Available employees retrieved successfully.",
+            data: { employeeIds },
+        });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to retrieve available employees.";
+        res.status(message.includes("not found") ? 404 : 500).json({ success: false, message });
+    }
+};
+
 export const cancel = async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     const validation = validateAppointmentId(req.params.id);
     if (!validation.isValid) 
