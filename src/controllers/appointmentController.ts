@@ -193,6 +193,28 @@ const changeStatus = async (req: Request<{ id: string }>,
 export const start = (req: Request<{ id: string }>, res: Response) => changeStatus(req, res, "start");
 export const complete = (req: Request<{ id: string }>, res: Response) => changeStatus(req, res, "complete");
 
+export const assignEmployee = async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+    const appointmentId = validateAppointmentId(req.params.id);
+    const employeeId = typeof req.body?.employeeId === "number" && Number.isInteger(req.body.employeeId) && req.body.employeeId > 0
+        ? req.body.employeeId
+        : null;
+    if (!appointmentId.isValid) 
+        return sendBadRequest(res, appointmentId.message);
+    if (employeeId === null) 
+        return sendBadRequest(res, "A valid employee is required.");
+    try {
+        const appointment = await service.assignEmployeeToAppointment(appointmentId.data, employeeId);
+        res.status(200).json({
+            success: true,
+            message: "Employee assigned successfully.",
+            data: { appointment: formatAppointment(appointment) },
+        });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to assign employee.";
+        res.status(message.includes("not found") ? 404 : 409).json({ success: false, message });
+    }
+};
+
 export const cancel = async (req: Request<{ id: string }>, res: Response): Promise<void> => {
     const validation = validateAppointmentId(req.params.id);
     if (!validation.isValid) 

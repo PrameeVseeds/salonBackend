@@ -413,6 +413,16 @@ export const updateStatus = async (id: number,fromStatus: AppointmentRow["status
   return result.affectedRows > 0;
 };
 
+export const assignEmployee = async (id: number, employeeId: number): Promise<boolean> => {
+  const [result] = await pool.execute<ResultSetHeader>(
+    `UPDATE appointments
+        SET employee_id = ?
+      WHERE id = ? AND status = 'Scheduled'`,
+    [employeeId, id],
+  );
+  return result.affectedRows > 0;
+};
+
 export const startWithinScheduledWindow = async (id: number): Promise<boolean> => {
   const [result] = await pool.execute<ResultSetHeader>(
     `UPDATE appointments

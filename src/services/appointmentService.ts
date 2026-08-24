@@ -11,6 +11,18 @@ const toMinutes = (time: string): number => {
 const toTime = (minutes: number): string =>
   `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}:00`;
 
+const appointmentStartTime = (date: string, time: string): number =>
+  new Date(`${date}T${time}`).getTime();
+
+const isPastOrCurrentTime = (date: string, time: string): boolean =>
+  appointmentStartTime(date, time) <= Date.now();
+
+const toDateKey = (value: unknown): string => {
+  if (!(value instanceof Date)) 
+    return String(value).slice(0, 10);
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+};
+
 const overlaps = (start: number,end: number,range: appointmentInterface.AppointmentTimeRange,): boolean =>
   start < toMinutes(range.end_time) && end > toMinutes(range.start_time);
 
@@ -125,6 +137,7 @@ export const getAvailability = async (
     start + duration + buffer <= closing;
     start += slotStep
   ) {
+    if (isPastOrCurrentTime(query.date, toTime(start))) continue;
     const serviceBookings = context.serviceAppointments.filter((range) =>
       overlaps(start, start + duration + buffer, range),
     ).length;
@@ -170,10 +183,7 @@ const saveAppointment = async (customerId: number, input: AppointmentRequest, ap
     if (!(await repository.lockService(connection, input.serviceId)))
       throw new Error("Service not found or inactive.");
 
-    const assignedCandidates = input.employeeId
-      ? [input.employeeId]
-      : await repository.findActiveEmployeeIdsForService(input.serviceId, connection);
-    const candidates: Array<number | null> = assignedCandidates.length ? assignedCandidates : [null];
+    const candidates: Array<number | null> = input.employeeId ? [input.employeeId] : [null];
     const scheduling = await repository.findSchedulingSettings(connection);
     const start = toMinutes(input.startTime);
     let selectedEmployeeId: number | null = null;
@@ -188,6 +198,7 @@ const saveAppointment = async (customerId: number, input: AppointmentRequest, ap
       const opening = toMinutes(context.workingDay.opening_time);
       const slotStep = Number(context.service.duration_minutes) + Number(scheduling.appointment_buffer_minutes);
       const unavailable = start < opening ||
+        isPastOrCurrentTime(input.appointmentDate, toTime(start)) ||
         (start - opening) % slotStep !== 0 ||
         bufferedEnd > toMinutes(context.workingDay.closing_time) ||
         context.blocked.some((range) => overlaps(start, bufferedEnd, range)) ||
@@ -253,6 +264,31 @@ export const deleteOwnedAppointment = (id: number, customerId: number) =>
   repository.removeOwned(id, customerId);
 export const getAllAppointments = (filters: AppointmentFilters) =>
   repository.findAll(filters);
+
+export const assignEmployeeToAppointment = async (id: number, employeeId: number): Promise<AppointmentRow> => {
+  const appointment = await repository.findById(id);
+  if (!appointment) throw new Error("Appointment not found.");
+  if (appointment.status !== "Scheduled")
+    throw new Error("Only a scheduled appointment can have its employee changed.");
+  if (!(await repository.employeeOffersService(employeeId, appointment.service_id)))
+    throw new Error("The selected employee is not active or does not offer this service.");
+
+  const context = await getScheduleContext({
+    date: toDateKey(appointment.appointment_date),
+    serviceId: appointment.service_id,
+    employeeId,
+  }, appointment.id);
+  const start = toMinutes(appointment.start_time);
+  const end = toMinutes(appointment.end_time);
+  if (context.unavailable || context.blocked.some((range) => overlaps(start, end, range)))
+    throw new Error("The selected employee is unavailable during this appointment.");
+  if (!(await repository.assignEmployee(id, employeeId)))
+    throw new Error("Only a scheduled appointment can have its employee changed.");
+
+  const updated = await repository.findById(id);
+  if (!updated) throw new Error("Appointment not found.");
+  return updated;
+};
 
 export const startAppointment = async (id: number): Promise<AppointmentRow> => {
   if (!(await repository.startWithinScheduledWindow(id)))
