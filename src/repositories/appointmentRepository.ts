@@ -342,6 +342,31 @@ export const findAll = async (filters: AppointmentFilters,): Promise<Appointment
   return rows;
 };
 
+export const findTodayScheduled = async (): Promise<AppointmentRow[]> => {
+  const [rows] = await pool.execute<AppointmentRow[]>(
+    `SELECT a.id, a.start_time, a.end_time, a.total_amount,
+            CURRENT_TIMESTAMP BETWEEN
+              TIMESTAMP(a.appointment_date, a.start_time)
+              AND TIMESTAMP(a.appointment_date, a.end_time) AS can_start,
+            CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
+            COALESCE(
+              GROUP_CONCAT(aps_service.name ORDER BY aps.start_time SEPARATOR ', '),
+              s.name
+            ) AS service_name
+       FROM appointments a
+       INNER JOIN customers c ON c.id = a.customer_id
+       INNER JOIN services s ON s.id = a.service_id
+       LEFT JOIN appointment_services aps ON aps.appointment_id = a.id
+       LEFT JOIN services aps_service ON aps_service.id = aps.service_id
+      WHERE a.appointment_date = CURRENT_DATE
+        AND a.status = 'Scheduled'
+      GROUP BY a.id, a.appointment_date, a.start_time, a.end_time, a.total_amount,
+               c.first_name, c.last_name, s.name
+      ORDER BY a.start_time ASC`,
+  );
+  return rows;
+};
+
 export const findForSchedule = async (employeeId: number, date: string,): Promise<AppointmentRow[]> => {
   const [rows] = await pool.execute<AppointmentRow[]>(
     `SELECT ${fields} 

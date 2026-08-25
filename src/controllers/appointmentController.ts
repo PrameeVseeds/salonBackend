@@ -170,6 +170,35 @@ export const getAll = async (req: Request, res: Response): Promise<void> => {
     }
 };
 
+export const todayBoard = async (_req: Request, res: Response): Promise<void> => {
+    try {
+        const appointments = await service.getTodayAppointmentBoard();
+        res.status(200).json({
+            success: true,
+            message: "Today's appointments retrieved successfully.",
+            data: {
+                appointments: appointments.map((appointment) => ({
+                    id: appointment.id,
+                    time: {
+                        start: appointment.start_time,
+                        end: appointment.end_time,
+                    },
+                    customer: appointment.customer_name,
+                    service: appointment.service_name,
+                    amount: Number(appointment.total_amount),
+                    canStart: Boolean(appointment.can_start),
+                })),
+            },
+        });
+    }
+    catch {
+        res.status(500).json({
+            success: false,
+            message: "Failed to retrieve today's appointments.",
+        });
+    }
+};
+
 const changeStatus = async (req: Request<{ id: string }>,
     res: Response,action: "start" | "complete",): Promise<void> => {
     const validation = validateAppointmentId(req.params.id);

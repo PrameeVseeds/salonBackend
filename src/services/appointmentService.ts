@@ -429,6 +429,8 @@ export const deleteOwnedAppointment = (id: number, customerId: number) =>
 export const getAllAppointments = (filters: AppointmentFilters) =>
   repository.findAll(filters).then(repository.attachAppointmentServices);
 
+export const getTodayAppointmentBoard = () => repository.findTodayScheduled();
+
 export const assignEmployeeToAppointment = async (id: number, employeeId: number, serviceId?: number): Promise<AppointmentRow> => {
   const appointment = await repository.findById(id);
   if (!appointment) throw new Error("Appointment not found.");
