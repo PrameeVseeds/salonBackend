@@ -4,7 +4,10 @@ import type { NotificationRow } from "../models/notificationModel.js";
 import * as repository from "../repositories/notificationRepository.js";
 import { sendEmail } from "./emailService.js";
 
-export const deliverNotification = async (notification: NotificationRow): Promise<NotificationRow> => {
+export const deliverNotification = async (
+    notification: NotificationRow,
+    emailContent?: { text?: string; html?: string },
+): Promise<NotificationRow> => {
     try {
         if (notification.notification_type !== "Email")
             throw new Error(`${notification.notification_type} provider is not configured.`);
@@ -14,7 +17,7 @@ export const deliverNotification = async (notification: NotificationRow): Promis
         if (!email)
             throw new Error("Customer email not found.");
 
-        await sendEmail(email, notification.title, notification.message);
+        await sendEmail(email, notification.title, emailContent?.text ?? notification.message, emailContent?.html);
         await repository.updateDeliveryStatus(notification.id, "Sent");
 
     } catch {
@@ -78,7 +81,22 @@ export const createAppointmentReminder = async (appointment: AppointmentRow): Pr
     if (!notification)
         return;
 
-    await deliverNotification(notification);
+    const frontendUrl = process.env.FRONTEND_URL?.replace(/\/+$/, "");
+    const cancellationUrl = frontendUrl ? `${frontendUrl}/appointments?cancel=${appointment.id}` : null;
+    await deliverNotification(notification, cancellationUrl ? {
+        text: `${message}\n\nNeed to cancel? Review and confirm your cancellation here: ${cancellationUrl}`,
+        html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#2b2924;max-width:560px;margin:auto">
+          <div style="padding:24px;border:1px solid #e5dfd4;border-radius:14px">
+            <h2 style="margin:0 0 12px">Appointment reminder</h2>
+            <p style="margin:0 0 18px">${message}</p>
+            <p style="margin:0 0 10px;color:#6f675d">If you can no longer attend,
+             you can review and confirm the cancellation securely in your account.</p>
+            <a href="${cancellationUrl}" style="display:inline-block;padding:11px 18px;border-radius:8px;color:#fff;background:#b83249;
+            text-decoration:none;font-weight:700">Cancel booking</a>
+            <p style="margin:14px 0 0;color:#8a8176;font-size:12px">Signing in may be required. The appointment is not cancelled until you confirm.</p>
+          </div>
+        </div>`,
+    } : undefined);
     const staffRecipients = [...new Set([
         appointment.admin_email,
         appointment.employee_email,
