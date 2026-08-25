@@ -12,10 +12,19 @@ export interface AppointmentServiceInfo extends RowDataPacket {
 
 export interface AppointmentServiceSegment {
   serviceId: number;
+  subServiceId: number | null;
   employeeId: number | null;
   startTime: string;
   endTime: string;
   price: number;
+}
+
+export interface AppointmentSubServiceInfo extends RowDataPacket {
+  id: number;
+  service_id: number;
+  duration_minutes: number;
+  price: number;
+  is_active: boolean;
 }
 
 export interface AppointmentTimeRange extends RowDataPacket {

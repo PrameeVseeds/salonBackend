@@ -1,7 +1,8 @@
 import type { ResultSetHeader } from "mysql2";
 import { pool } from "../config/db.js";
-import type {RegisterServiceInput,UpdateServiceInput,} from "../interfaces/serviceInterface.js";
+import type {RegisterServiceInput, SaveSubServiceInput, UpdateServiceInput,} from "../interfaces/serviceInterface.js";
 import type { ServiceRow } from "../models/serviceModel.js";
+import type { SubServiceRow } from "../models/subServiceModel.js";
 
 const serviceSelectFields =
     `services.id, services.name, services.description, services.duration_minutes, services.price,
@@ -22,7 +23,9 @@ export const findServiceById = async (serviceId: number): Promise<ServiceRow | n
         [serviceId],
     );
 
-    return rows[0] ?? null;
+    if (!rows[0]) return null;
+    const subServices = await findAllSubServices();
+    return { ...rows[0], sub_services: subServices.filter((item) => item.service_id === rows[0]!.id) } as ServiceRow;
 };
 
 export const findAllServices = async (): Promise<ServiceRow[]> => {
@@ -32,7 +35,52 @@ export const findAllServices = async (): Promise<ServiceRow[]> => {
          ORDER BY created_at DESC`,
     );
 
+    const subServices = await findAllSubServices();
+    return rows.map((service) => ({
+        ...service,
+        sub_services: subServices.filter((item) => item.service_id === service.id),
+    })) as ServiceRow[];
+};
+
+export const findAllSubServices = async (): Promise<SubServiceRow[]> => {
+    const [rows] = await pool.execute<SubServiceRow[]>(
+        `SELECT id, service_id, name, duration_minutes, price, image_url, is_active, created_at, updated_at
+         FROM sub_services ORDER BY service_id, created_at`,
+    );
     return rows;
+};
+
+export const findSubServiceById = async (id: number): Promise<SubServiceRow | null> => {
+    const [rows] = await pool.execute<SubServiceRow[]>(
+        `SELECT id, service_id, name, duration_minutes, price, image_url, is_active, created_at, updated_at
+         FROM sub_services WHERE id = ? LIMIT 1`, [id],
+    );
+    return rows[0] ?? null;
+};
+
+export const createSubService = async (serviceId: number, input: SaveSubServiceInput): Promise<SubServiceRow | null> => {
+    const [result] = await pool.execute<ResultSetHeader>(
+        `INSERT INTO sub_services (service_id, name, duration_minutes, price, image_url, is_active)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [serviceId, input.name, input.duration_minutes, input.price, input.image_url, input.is_active],
+    );
+    return findSubServiceById(result.insertId);
+};
+
+export const updateSubService = async (serviceId: number, id: number, input: SaveSubServiceInput): Promise<SubServiceRow | null> => {
+    const [result] = await pool.execute<ResultSetHeader>(
+        `UPDATE sub_services SET name = ?, duration_minutes = ?, price = ?, image_url = ?, is_active = ?
+         WHERE id = ? AND service_id = ?`,
+        [input.name, input.duration_minutes, input.price, input.image_url, input.is_active, id, serviceId],
+    );
+    return result.affectedRows ? findSubServiceById(id) : null;
+};
+
+export const deleteSubService = async (serviceId: number, id: number): Promise<boolean> => {
+    const [result] = await pool.execute<ResultSetHeader>(
+        "DELETE FROM sub_services WHERE id = ? AND service_id = ?", [id, serviceId],
+    );
+    return result.affectedRows > 0;
 };
 
 export const findServiceByName = async (name: string): Promise<ServiceRow | null> => {

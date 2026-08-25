@@ -4,6 +4,23 @@ import { formatService } from "../utils/mappers/serviceMapper.js";
 import { sendBadRequest } from "../utils/responseHelper.js";
 import * as serviceValidator from "../validators/serviceValidator.js";
 
+const parseSubService = (body: Record<string, unknown>) => {
+    const name = String(body.name ?? "").trim();
+    const duration = Number(body.durationMinutes ?? body.duration_minutes);
+    const price = Number(body.price);
+    const imageUrl = String(body.imageUrl ?? body.image_url ?? "").trim();
+    if (!name || !Number.isInteger(duration) || duration <= 0 || !Number.isFinite(price) || price < 0 || !imageUrl)
+        return null;
+    return { name, duration_minutes: duration, price, image_url: imageUrl, is_active: body.isActive !== false && body.is_active !== false };
+};
+
+const formatSubService = (item: import("../models/subServiceModel.js").SubServiceRow) => ({
+    id: item.id, serviceId: item.service_id, name: item.name,
+    durationMinutes: Number(item.duration_minutes), price: Number(item.price),
+    imageUrl: item.image_url, isActive: Boolean(item.is_active),
+    createdAt: item.created_at, updatedAt: item.updated_at,
+});
+
 export const uploadImage = async (req: Request, res: Response): Promise<void> => {
     if (!req.file) {
         sendBadRequest(res, "Service image is required.");
@@ -165,4 +182,38 @@ export const deleteService = async (req: Request<{ id: string }>, res: Response,
     } catch {
         res.status(500).json({ success: false, message: "Failed to delete service." });
     }
+};
+
+export const createSubService = async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+    try {
+        const serviceId = Number(req.params.id);
+        const input = parseSubService(req.body);
+        if (!Number.isInteger(serviceId) || serviceId <= 0 || !input) return sendBadRequest(res, "Name, duration, price and image are required.");
+        const item = await serviceService.createSubService(serviceId, input);
+        if (!item) { res.status(404).json({ success: false, message: "Service not found." }); return; }
+        res.status(201).json({ success: true, message: "Sub-service created successfully.", data: { subService: formatSubService(item) } });
+    } catch (error) {
+        const message = error instanceof Error && error.message.includes("Duplicate") ? "A sub-service with this name already exists." : "Failed to create sub-service.";
+        res.status(message.includes("already") ? 409 : 500).json({ success: false, message });
+    }
+};
+
+export const updateSubService = async (req: Request<{ id: string; subServiceId: string }>, res: Response): Promise<void> => {
+    try {
+        const serviceId = Number(req.params.id), id = Number(req.params.subServiceId);
+        const input = parseSubService(req.body);
+        if (![serviceId, id].every((value) => Number.isInteger(value) && value > 0) || !input) return sendBadRequest(res, "Name, duration, price and image are required.");
+        const item = await serviceService.updateSubService(serviceId, id, input);
+        if (!item) { res.status(404).json({ success: false, message: "Sub-service not found." }); return; }
+        res.status(200).json({ success: true, message: "Sub-service updated successfully.", data: { subService: formatSubService(item) } });
+    } catch { res.status(500).json({ success: false, message: "Failed to update sub-service." }); }
+};
+
+export const deleteSubService = async (req: Request<{ id: string; subServiceId: string }>, res: Response): Promise<void> => {
+    try {
+        const serviceId = Number(req.params.id), id = Number(req.params.subServiceId);
+        if (![serviceId, id].every((value) => Number.isInteger(value) && value > 0)) return sendBadRequest(res, "Invalid sub-service ID.");
+        if (!(await serviceService.deleteSubService(serviceId, id))) { res.status(404).json({ success: false, message: "Sub-service not found." }); return; }
+        res.status(200).json({ success: true, message: "Sub-service deleted successfully." });
+    } catch { res.status(500).json({ success: false, message: "Failed to delete sub-service." }); }
 };

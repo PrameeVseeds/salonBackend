@@ -12,4 +12,15 @@ export const formatService = (service: ServiceRow) => ({
     assignedEmployeeCount: Number(service.assigned_employee_count ?? 0),
     createdAt: service.created_at,
     updatedAt: service.updated_at,
+    subServices: (service.sub_services ?? []).map((item) => ({
+        id: item.id,
+        serviceId: item.service_id,
+        name: item.name,
+        durationMinutes: Number(item.duration_minutes),
+        price: Number(item.price),
+        imageUrl: item.image_url,
+        isActive: Boolean(item.is_active),
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+    })),
 })

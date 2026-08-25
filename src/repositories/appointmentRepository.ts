@@ -45,6 +45,20 @@ export const findActiveServices = async (
     row is appointmentsServiceInterface.AppointmentServiceInfo => Boolean(row));
 };
 
+export const findActiveSubServices = async (
+  subServiceIds: Array<number | null>,
+  db: appointmentsServiceInterface.AppointmentQueryExecutor = pool,
+): Promise<Array<appointmentsServiceInterface.AppointmentSubServiceInfo | null>> => {
+  const ids = subServiceIds.filter((id): id is number => id !== null);
+  if (!ids.length) return subServiceIds.map(() => null);
+  const placeholders = ids.map(() => "?").join(",");
+  const [rows] = await db.execute<appointmentsServiceInterface.AppointmentSubServiceInfo[]>(
+    `SELECT id, service_id, duration_minutes, price, is_active FROM sub_services
+     WHERE is_active = TRUE AND id IN (${placeholders})`, ids,
+  );
+  return subServiceIds.map((id) => id === null ? null : rows.find((row) => row.id === id) ?? null);
+};
+
 export const lockService = async (db: PoolConnection, serviceId: number): Promise<boolean> => {
   const [rows] = await db.execute<import("mysql2").RowDataPacket[]>(
     "SELECT id FROM services WHERE id = ? AND is_active = TRUE FOR UPDATE",
@@ -247,19 +261,21 @@ export const findById = async (id: number): Promise<AppointmentRow | null> => {
 
 export const findAppointmentServices = async (appointmentId: number) => {
   const [rows] = await pool.execute<import("mysql2").RowDataPacket[]>(
-    `SELECT aps.service_id AS serviceId, s.name AS serviceName,
+    `SELECT aps.service_id AS serviceId, aps.sub_service_id AS subServiceId,
+            COALESCE(ss.name, s.name) AS serviceName,
             aps.employee_id AS employeeId,
             CASE WHEN e.id IS NULL THEN NULL ELSE CONCAT(e.first_name, ' ', e.last_name) END AS employeeName,
-            s.duration_minutes AS durationMinutes, aps.start_time AS startTime,
+            COALESCE(ss.duration_minutes, s.duration_minutes) AS durationMinutes, aps.start_time AS startTime,
             aps.end_time AS endTime, aps.price
        FROM appointment_services aps
        INNER JOIN services s ON s.id = aps.service_id
+       LEFT JOIN sub_services ss ON ss.id = aps.sub_service_id
        LEFT JOIN employees e ON e.id = aps.employee_id
       WHERE aps.appointment_id = ? ORDER BY aps.sequence_number`,
     [appointmentId],
   );
   return rows.map((row) => ({
-    serviceId: Number(row.serviceId), serviceName: String(row.serviceName),
+    serviceId: Number(row.serviceId), subServiceId: row.subServiceId === null ? null : Number(row.subServiceId), serviceName: String(row.serviceName),
     employeeId: row.employeeId === null ? null : Number(row.employeeId), employeeName: row.employeeName === null ? null : String(row.employeeName),
     durationMinutes: Number(row.durationMinutes), startTime: String(row.startTime), endTime: String(row.endTime), price: Number(row.price),
   }));
@@ -465,9 +481,9 @@ export const replaceAppointmentServices = async (
   for (const [index, segment] of segments.entries()) {
     await connection.execute(
       `INSERT INTO appointment_services
-        (appointment_id, service_id, employee_id, sequence_number, start_time, end_time, price)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [appointmentId, segment.serviceId, segment.employeeId, index + 1, segment.startTime, segment.endTime, segment.price],
+        (appointment_id, service_id, sub_service_id, employee_id, sequence_number, start_time, end_time, price)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [appointmentId, segment.serviceId, segment.subServiceId, segment.employeeId, index + 1, segment.startTime, segment.endTime, segment.price],
     );
   }
 };

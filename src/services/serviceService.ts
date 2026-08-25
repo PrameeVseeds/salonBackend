@@ -1,5 +1,6 @@
-import type {RegisterServiceInput,UpdateServiceInput,} from "../interfaces/serviceInterface.js";
+import type {RegisterServiceInput, SaveSubServiceInput, UpdateServiceInput,} from "../interfaces/serviceInterface.js";
 import type { ServiceRow } from "../models/serviceModel.js";
+import type { SubServiceRow } from "../models/subServiceModel.js";
 import * as serviceRepository from "../repositories/serviceRepository.js";
 
 const normalizeInput = <T extends RegisterServiceInput | UpdateServiceInput>(input: T): T => ({
@@ -56,3 +57,18 @@ export const deleteServiceById = async (serviceId: number): Promise<boolean> => 
 
     return serviceRepository.deleteService(serviceId);
 };
+
+const normalizeSubService = (input: SaveSubServiceInput): SaveSubServiceInput => ({
+    ...input, name: input.name.trim(), image_url: input.image_url.trim(),
+});
+
+export const createSubService = async (serviceId: number, input: SaveSubServiceInput): Promise<SubServiceRow | null> => {
+    if (!(await serviceRepository.findServiceById(serviceId))) return null;
+    return serviceRepository.createSubService(serviceId, normalizeSubService(input));
+};
+
+export const updateSubService = (serviceId: number, id: number, input: SaveSubServiceInput): Promise<SubServiceRow | null> =>
+    serviceRepository.updateSubService(serviceId, id, normalizeSubService(input));
+
+export const deleteSubService = (serviceId: number, id: number): Promise<boolean> =>
+    serviceRepository.deleteSubService(serviceId, id);

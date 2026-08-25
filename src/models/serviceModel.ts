@@ -1,4 +1,5 @@
 import { RowDataPacket } from "mysql2";
+import type { SubServiceRow } from "./subServiceModel.js";
 
 export interface ServiceRow extends RowDataPacket {
     id: number;
@@ -12,4 +13,5 @@ export interface ServiceRow extends RowDataPacket {
     assigned_employee_count: number;
     created_at: Date;
     updated_at: Date;
+    sub_services?: SubServiceRow[];
 }
