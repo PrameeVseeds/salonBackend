@@ -4,7 +4,7 @@ import type { AppointmentFilters } from "../interfaces/appointmentInterface.js";
 import * as appointmentsServiceInterface from "../interfaces/appointmentServiceInterface.js";
 import type { AppointmentRow } from "../models/appointmentModel.js";
 
-const fields =`id, customer_id, employee_id, service_id, appointment_date, 
+const fields = `id, customer_id, employee_id, service_id, appointment_date, 
 start_time, end_time, total_amount, notes, status, started_at, completed_at,
 cancelled_at, cancellation_reason, created_at, updated_at`;
 const customerDetailFields = `a.id, a.customer_id, a.employee_id, a.service_id, a.appointment_date,
@@ -24,6 +24,25 @@ export const findActiveService = async (
     [serviceId],
   );
   return rows[0] ?? null;
+};
+
+export const findActiveServices = async (
+  serviceIds: number[],
+  db: appointmentsServiceInterface.AppointmentQueryExecutor = pool,
+): Promise<appointmentsServiceInterface.AppointmentServiceInfo[]> => {
+  if (!serviceIds.length)
+    return [];
+  const placeholders = serviceIds.map(() => "?").join(",");
+  const [rows] = await db.execute<appointmentsServiceInterface.AppointmentServiceInfo[]>(
+    `SELECT id, duration_minutes, price, is_active, max_concurrent_appointments
+       FROM services 
+       WHERE is_active = TRUE 
+       AND id 
+       IN (${placeholders})`,
+    serviceIds,
+  );
+  return serviceIds.map((id) => rows.find((row) => row.id === id)).filter((row):
+    row is appointmentsServiceInterface.AppointmentServiceInfo => Boolean(row));
 };
 
 export const lockService = async (db: PoolConnection, serviceId: number): Promise<boolean> => {
@@ -63,7 +82,7 @@ export const findActiveEmployeeIdsForService = async (
   return rows.map((row) => Number(row.id));
 };
 
-export const employeeOffersService = async (employeeId: number,serviceId: number,
+export const employeeOffersService = async (employeeId: number, serviceId: number,
   db: appointmentsServiceInterface.AppointmentQueryExecutor = pool,
 ): Promise<boolean> => {
   const [rows] = await db.execute<import("mysql2").RowDataPacket[]>(
@@ -86,7 +105,7 @@ export const isClosedDate = async (
     `SELECT id 
         FROM closed_dates 
         WHERE closed_date = ? 
-        LIMIT 1`,[date],
+        LIMIT 1`, [date],
   );
   return rows.length > 0;
 };
@@ -112,7 +131,7 @@ export const findBusinessBreaks = async (
   const [rows] = await db.execute<appointmentsServiceInterface.AppointmentTimeRange[]>(
     `SELECT start_time, end_time 
         FROM business_breaks 
-        WHERE break_date = ?`,[date],
+        WHERE break_date = ?`, [date],
   );
   return rows;
 };
@@ -139,15 +158,16 @@ export const findAppointmentTimeRanges = async (
   excludeAppointmentId?: number,
   db: appointmentsServiceInterface.AppointmentQueryExecutor = pool,
 ): Promise<appointmentsServiceInterface.AppointmentTimeRange[]> => {
-  const exclusion = excludeAppointmentId ? " AND id != ?" : "";
+  const exclusion = excludeAppointmentId ? " AND a.id != ?" : "";
   const values: Array<number | string> = excludeAppointmentId
     ? [employeeId, date, excludeAppointmentId]
     : [employeeId, date];
   const [rows] = await db.execute<appointmentsServiceInterface.AppointmentTimeRange[]>(
-    `SELECT start_time, end_time 
-        FROM appointments
-         WHERE employee_id = ? AND appointment_date = ?
-           AND status IN ('Scheduled', 'In Progress')${exclusion}`,
+    `SELECT aps.start_time, aps.end_time
+       FROM appointment_services aps
+       INNER JOIN appointments a ON a.id = aps.appointment_id
+      WHERE aps.employee_id = ? AND a.appointment_date = ?
+        AND a.status IN ('Scheduled', 'In Progress')${exclusion}`,
     values,
   );
   return rows;
@@ -159,15 +179,16 @@ export const findServiceAppointmentTimeRanges = async (
   excludeAppointmentId?: number,
   db: appointmentsServiceInterface.AppointmentQueryExecutor = pool,
 ): Promise<appointmentsServiceInterface.AppointmentTimeRange[]> => {
-  const exclusion = excludeAppointmentId ? " AND id != ?" : "";
+  const exclusion = excludeAppointmentId ? " AND a.id != ?" : "";
   const values: Array<number | string> = excludeAppointmentId
     ? [serviceId, date, excludeAppointmentId]
     : [serviceId, date];
   const [rows] = await db.execute<appointmentsServiceInterface.AppointmentTimeRange[]>(
-    `SELECT start_time, end_time 
-        FROM appointments
-         WHERE service_id = ? AND appointment_date = ?
-           AND status IN ('Scheduled', 'In Progress')${exclusion}`,
+    `SELECT aps.start_time, aps.end_time
+       FROM appointment_services aps
+       INNER JOIN appointments a ON a.id = aps.appointment_id
+      WHERE aps.service_id = ? AND a.appointment_date = ?
+        AND a.status IN ('Scheduled', 'In Progress')${exclusion}`,
     values,
   );
   return rows;
@@ -178,11 +199,11 @@ export const findSchedulingSettings = async (
 ): Promise<appointmentsServiceInterface.AppointmentSchedulingSettings> => {
   const [rows] = await db.execute<
     appointmentsServiceInterface.AppointmentSchedulingSettings[]>(
-    `SELECT booking_interval_minutes, appointment_buffer_minutes 
+      `SELECT booking_interval_minutes, appointment_buffer_minutes 
         FROM settings 
         WHERE id = 1 
         LIMIT 1`,
-  );
+    );
   return (
     rows[0] ??
     ({
@@ -200,13 +221,39 @@ export const findById = async (id: number): Promise<AppointmentRow | null> => {
         INNER JOIN services s ON s.id = a.service_id
         WHERE a.id = ?
         LIMIT 1`, [id]);
+  if (rows[0]) rows[0].services = await findAppointmentServices(rows[0].id);
   return rows[0] ?? null;
+};
+
+export const findAppointmentServices = async (appointmentId: number) => {
+  const [rows] = await pool.execute<import("mysql2").RowDataPacket[]>(
+    `SELECT aps.service_id AS serviceId, s.name AS serviceName,
+            aps.employee_id AS employeeId,
+            CASE WHEN e.id IS NULL THEN NULL ELSE CONCAT(e.first_name, ' ', e.last_name) END AS employeeName,
+            s.duration_minutes AS durationMinutes, aps.start_time AS startTime,
+            aps.end_time AS endTime, aps.price
+       FROM appointment_services aps
+       INNER JOIN services s ON s.id = aps.service_id
+       LEFT JOIN employees e ON e.id = aps.employee_id
+      WHERE aps.appointment_id = ? ORDER BY aps.sequence_number`,
+    [appointmentId],
+  );
+  return rows.map((row) => ({
+    serviceId: Number(row.serviceId), serviceName: String(row.serviceName),
+    employeeId: row.employeeId === null ? null : Number(row.employeeId), employeeName: row.employeeName === null ? null : String(row.employeeName),
+    durationMinutes: Number(row.durationMinutes), startTime: String(row.startTime), endTime: String(row.endTime), price: Number(row.price),
+  }));
+};
+
+export const attachAppointmentServices = async (appointments: AppointmentRow[]): Promise<AppointmentRow[]> => {
+  await Promise.all(appointments.map(async (appointment) => { appointment.services = await findAppointmentServices(appointment.id); }));
+  return appointments;
 };
 
 export const findOwnedById = async (id: number, customerId: number): Promise<AppointmentRow | null> => {
   const [rows] = await pool.execute<AppointmentRow[]>
-  (
-    `SELECT ${customerDetailFields}
+    (
+      `SELECT ${customerDetailFields}
         FROM appointments a
         LEFT JOIN employees e ON e.id = a.employee_id
         INNER JOIN services s ON s.id = a.service_id
@@ -275,7 +322,7 @@ export const findAll = async (filters: AppointmentFilters,): Promise<Appointment
   return rows;
 };
 
-export const findForSchedule = async (employeeId: number,date: string,): Promise<AppointmentRow[]> => {
+export const findForSchedule = async (employeeId: number, date: string,): Promise<AppointmentRow[]> => {
   const [rows] = await pool.execute<AppointmentRow[]>(
     `SELECT ${fields} 
         FROM appointments 
@@ -293,17 +340,17 @@ export const withTransaction = async <T>(work: (connection: PoolConnection) => P
     const result = await work(connection);
     await connection.commit();
     return result;
-  } 
+  }
   catch (error) {
     await connection.rollback();
     throw error;
-  } 
+  }
   finally {
     connection.release();
   }
 };
 
-export const lockEmployee = async (connection: PoolConnection,employeeId: number,): Promise<boolean> => {
+export const lockEmployee = async (connection: PoolConnection, employeeId: number,): Promise<boolean> => {
   const [rows] = await connection.execute<import("mysql2").RowDataPacket[]>(
     `SELECT id 
         FROM employees 
@@ -313,7 +360,7 @@ export const lockEmployee = async (connection: PoolConnection,employeeId: number
   return rows.length > 0;
 };
 
-export const lockOwnedAppointment = async (connection: PoolConnection,id: number,customerId: number,
+export const lockOwnedAppointment = async (connection: PoolConnection, id: number, customerId: number,
 ): Promise<AppointmentRow | null> => {
   const [rows] = await connection.execute<AppointmentRow[]>(
     `SELECT ${fields} 
@@ -356,6 +403,22 @@ export const insert = async (
   return result.insertId;
 };
 
+export const replaceAppointmentServices = async (
+  connection: PoolConnection,
+  appointmentId: number,
+  segments: appointmentsServiceInterface.AppointmentServiceSegment[],
+): Promise<void> => {
+  await connection.execute("DELETE FROM appointment_services WHERE appointment_id = ?", [appointmentId]);
+  for (const [index, segment] of segments.entries()) {
+    await connection.execute(
+      `INSERT INTO appointment_services
+        (appointment_id, service_id, employee_id, sequence_number, start_time, end_time, price)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [appointmentId, segment.serviceId, segment.employeeId, index + 1, segment.startTime, segment.endTime, segment.price],
+    );
+  }
+};
+
 export const updateOwned = async (
   connection: PoolConnection,
   id: number,
@@ -389,7 +452,7 @@ export const updateOwned = async (
   return result.affectedRows > 0;
 };
 
-export const removeOwned = async (id: number,customerId: number,): Promise<boolean> => {
+export const removeOwned = async (id: number, customerId: number,): Promise<boolean> => {
   const [result] = await pool.execute<ResultSetHeader>(
     "DELETE FROM appointments WHERE id = ? AND customer_id = ?",
     [id, customerId],
@@ -397,7 +460,7 @@ export const removeOwned = async (id: number,customerId: number,): Promise<boole
   return result.affectedRows > 0;
 };
 
-export const updateStatus = async (id: number,fromStatus: AppointmentRow["status"],
+export const updateStatus = async (id: number, fromStatus: AppointmentRow["status"],
   toStatus: AppointmentRow["status"]): Promise<boolean> => {
   const timestampColumn = toStatus === "In Progress"
     ? "started_at"
@@ -421,6 +484,26 @@ export const assignEmployee = async (id: number, employeeId: number): Promise<bo
     [employeeId, id],
   );
   return result.affectedRows > 0;
+};
+
+export const assignServiceEmployee = async (appointmentId: number, serviceId: number, employeeId: number): Promise<boolean> => {
+  const [result] = await pool.execute<ResultSetHeader>(
+    `UPDATE appointment_services aps
+       INNER JOIN appointments a ON a.id = aps.appointment_id
+        SET aps.employee_id = ?
+      WHERE aps.appointment_id = ? AND aps.service_id = ? AND a.status = 'Scheduled'`,
+    [employeeId, appointmentId, serviceId],
+  );
+  if (!result.affectedRows) return false;
+  await pool.execute(
+    `UPDATE appointments a
+        SET employee_id = (
+          SELECT IF(COUNT(DISTINCT aps.employee_id) = 1, MAX(aps.employee_id), NULL)
+            FROM appointment_services aps WHERE aps.appointment_id = a.id
+        ) WHERE a.id = ?`,
+    [appointmentId],
+  );
+  return true;
 };
 
 export const startWithinScheduledWindow = async (id: number): Promise<boolean> => {
@@ -479,7 +562,7 @@ export const findDueInProgress = async (): Promise<AppointmentRow[]> => {
        LEFT JOIN employees e ON e.id = a.employee_id
        INNER JOIN services s ON s.id = a.service_id
       WHERE a.status = 'In Progress'
-        AND a.started_at + INTERVAL s.duration_minutes MINUTE <= CURRENT_TIMESTAMP`,
+        AND a.started_at + INTERVAL (TIMESTAMPDIFF(MINUTE, a.start_time, a.end_time)) MINUTE <= CURRENT_TIMESTAMP`,
   );
   return rows;
 };

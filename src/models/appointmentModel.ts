@@ -23,6 +23,16 @@ export interface AppointmentRow extends RowDataPacket {
     service_duration_minutes?: number;
     employee_email?: string | null;
     admin_email?: string;
+    services?: Array<{
+      serviceId: number;
+      serviceName: string;
+      employeeId: number | null;
+      employeeName: string | null;
+      durationMinutes: number;
+      startTime: string;
+      endTime: string;
+      price: number;
+    }>;
     created_at: Date;
     updated_at: Date;
 }

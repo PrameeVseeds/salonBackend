@@ -29,6 +29,7 @@ export const formatAppointment = (appointment: AppointmentRow) => ({
     employeeName: appointment.employee_name,
     serviceName: appointment.service_name,
     serviceDurationMinutes: appointment.service_duration_minutes,
+    services: appointment.services ?? [],
     createdAt: appointment.created_at,
     updatedAt: appointment.updated_at,
 });

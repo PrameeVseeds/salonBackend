@@ -198,12 +198,15 @@ export const assignEmployee = async (req: Request<{ id: string }>, res: Response
     const employeeId = typeof req.body?.employeeId === "number" && Number.isInteger(req.body.employeeId) && req.body.employeeId > 0
         ? req.body.employeeId
         : null;
+    const serviceId = typeof req.body?.serviceId === "number" && Number.isInteger(req.body.serviceId)
+    && req.body.serviceId > 0
+        ? req.body.serviceId : undefined;
     if (!appointmentId.isValid) 
         return sendBadRequest(res, appointmentId.message);
     if (employeeId === null) 
         return sendBadRequest(res, "A valid employee is required.");
     try {
-        const appointment = await service.assignEmployeeToAppointment(appointmentId.data, employeeId);
+        const appointment = await service.assignEmployeeToAppointment(appointmentId.data, employeeId, serviceId);
         res.status(200).json({
             success: true,
             message: "Employee assigned successfully.",
@@ -220,7 +223,9 @@ export const availableEmployees = async (req: Request<{ id: string }>, res: Resp
     if (!validation.isValid) 
         return sendBadRequest(res, validation.message);
     try {
-        const employeeIds = await service.getAvailableEmployeeIdsForAppointment(validation.data);
+        const serviceIdValue = Number(req.query.serviceId);
+        const serviceId = Number.isInteger(serviceIdValue) && serviceIdValue > 0 ? serviceIdValue : undefined;
+        const employeeIds = await service.getAvailableEmployeeIdsForAppointment(validation.data, serviceId);
         res.status(200).json({
             success: true,
             message: "Available employees retrieved successfully.",
