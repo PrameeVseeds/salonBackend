@@ -10,6 +10,14 @@ export interface AppointmentServiceInfo extends RowDataPacket {
   max_concurrent_appointments: number | null;
 }
 
+export interface AppointmentServiceSegment {
+  serviceId: number;
+  employeeId: number | null;
+  startTime: string;
+  endTime: string;
+  price: number;
+}
+
 export interface AppointmentTimeRange extends RowDataPacket {
   start_time: string;
   end_time: string;

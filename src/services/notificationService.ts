@@ -24,10 +24,13 @@ export const deliverNotification = async (notification: NotificationRow): Promis
 };
 
 export const createAppointmentConfirmation = async (appointment: AppointmentRow): Promise<void> => {
+    const serviceSummary = appointment.services?.length
+        ? ` Services: ${appointment.services.map((service) => service.serviceName).join(", ")}.`
+        : "";
     const notification = await repository.create({
         appointmentId: appointment.id, customerId: appointment.customer_id, type: "Email",
         title: "Appointment Confirmation",
-        message: `Your appointment is confirmed for ${appointment.appointment_date} from ${appointment.start_time} to ${appointment.end_time}.`,
+        message: `Your appointment is confirmed for ${appointment.appointment_date} from ${appointment.start_time} to ${appointment.end_time}.${serviceSummary}`,
     });
     if (notification) await deliverNotification(notification);
 };
@@ -51,8 +54,39 @@ export const createAppointmentCancellation = (appointment: AppointmentRow): Prom
     createAppointmentStatusNotification(
         appointment,
         "Appointment Cancelled",
-        `Your appointment for ${appointment.appointment_date} at ${appointment.start_time} was automatically cancelled because it was not started within the allowed grace period.`,
+        `Your appointment for ${appointment.appointment_date} at ${appointment.start_time} 
+        was automatically cancelled because it was not started within the allowed grace period.`,
     );
+
+export const createAppointmentStarted = (appointment: AppointmentRow): Promise<void> =>
+    createAppointmentStatusNotification(
+        appointment,
+        "Appointment Started",
+        `Your appointment for ${appointment.appointment_date} at ${appointment.start_time} has started.`,
+    );
+
+export const createAppointmentReminder = async (appointment: AppointmentRow): Promise<void> => {
+    const message = `Reminder: appointment #${appointment.id} is scheduled for ${appointment.appointment_date} 
+    from ${appointment.start_time} to ${appointment.end_time}.`;
+    const notification = await repository.create({
+        appointmentId: appointment.id,
+        customerId: appointment.customer_id,
+        type: "Email",
+        title: "Appointment Reminder",
+        message,
+    });
+    if (!notification)
+        return;
+
+    await deliverNotification(notification);
+    const staffRecipients = [...new Set([
+        appointment.admin_email,
+        appointment.employee_email,
+    ].filter((email): email is string => Boolean(email)))];
+    await Promise.allSettled(
+        staffRecipients.map((email) => sendEmail(email, "Appointment Reminder", message)),
+    );
+};
 
 export const createAppointmentCompletion = (appointment: AppointmentRow): Promise<void> =>
     createAppointmentStatusNotification(

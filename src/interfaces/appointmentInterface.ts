@@ -1,6 +1,7 @@
 export interface AppointmentRequest {
     employeeId: number | null;
     serviceId: number;
+    serviceIds: number[];
     appointmentDate: string;
     startTime: string;
     notes: string | null;
@@ -17,5 +18,6 @@ export interface AppointmentFilters {
 export interface AvailabilityQuery {
     date: string;
     serviceId: number;
+    serviceIds: number[];
     employeeId: number | null;
 }

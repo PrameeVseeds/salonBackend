@@ -14,6 +14,8 @@ router.patch("/my/:id/cancel", authenticateCustomer, controller.cancelOwned);
 router.get("/", authenticateUser, authorizeRoles("super_admin", "admin"), controller.getAll);
 router.patch("/:id/start", authenticateUser, authorizeRoles("super_admin", "admin"), controller.start);
 router.patch("/:id/complete", authenticateUser, authorizeRoles("super_admin", "admin"), controller.complete);
+router.patch("/:id/employee", authenticateUser, authorizeRoles("super_admin", "admin"), controller.assignEmployee);
+router.get("/:id/available-employees", authenticateUser, authorizeRoles("super_admin", "admin"), controller.availableEmployees);
 router.patch("/:id/cancel", authenticateUser, authorizeRoles("super_admin", "admin"), controller.cancel);
 router.get("/:appointmentId/notifications", authenticateUser, authorizeRoles("super_admin", "admin"), getByAppointment);
 router.get("/:id", authenticateCustomer, controller.getOwned);

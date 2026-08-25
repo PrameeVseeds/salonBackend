@@ -15,6 +15,7 @@ export const formatSettings = (settings: SettingsRow) => ({
   bookingIntervalMinutes: settings.booking_interval_minutes,
   appointmentBufferMinutes: settings.appointment_buffer_minutes,
   appointmentGracePeriodMinutes: settings.appointment_grace_period_minutes,
+  appointmentReminderMinutes: settings.appointment_reminder_minutes,
   createdAt: settings.created_at,
   updatedAt: settings.updated_at,
 });
