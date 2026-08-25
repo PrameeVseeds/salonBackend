@@ -194,6 +194,26 @@ export const findServiceAppointmentTimeRanges = async (
   return rows;
 };
 
+export const findCustomerAppointmentTimeRanges = async (
+  customerId: number,
+  date: string,
+  excludeAppointmentId?: number,
+  db: appointmentsServiceInterface.AppointmentQueryExecutor = pool,
+): Promise<appointmentsServiceInterface.AppointmentTimeRange[]> => {
+  const exclusion = excludeAppointmentId ? " AND id != ?" : "";
+  const values: Array<number | string> = excludeAppointmentId
+    ? [customerId, date, excludeAppointmentId]
+    : [customerId, date];
+  const [rows] = await db.execute<appointmentsServiceInterface.AppointmentTimeRange[]>(
+    `SELECT start_time, end_time
+       FROM appointments
+      WHERE customer_id = ? AND appointment_date = ?
+        AND status IN ('Scheduled', 'In Progress')${exclusion}`,
+    values,
+  );
+  return rows;
+};
+
 export const findSchedulingSettings = async (
   db: appointmentsServiceInterface.AppointmentQueryExecutor = pool,
 ): Promise<appointmentsServiceInterface.AppointmentSchedulingSettings> => {
@@ -360,6 +380,14 @@ export const lockEmployee = async (connection: PoolConnection, employeeId: numbe
   return rows.length > 0;
 };
 
+export const lockCustomer = async (connection: PoolConnection, customerId: number): Promise<boolean> => {
+  const [rows] = await connection.execute<import("mysql2").RowDataPacket[]>(
+    "SELECT id FROM customers WHERE id = ? AND is_active = TRUE FOR UPDATE",
+    [customerId],
+  );
+  return rows.length > 0;
+};
+
 export const lockOwnedAppointment = async (connection: PoolConnection, id: number, customerId: number,
 ): Promise<AppointmentRow | null> => {
   const [rows] = await connection.execute<AppointmentRow[]>(
@@ -477,13 +505,22 @@ export const updateStatus = async (id: number, fromStatus: AppointmentRow["statu
 };
 
 export const assignEmployee = async (id: number, employeeId: number): Promise<boolean> => {
-  const [result] = await pool.execute<ResultSetHeader>(
-    `UPDATE appointments
-        SET employee_id = ?
-      WHERE id = ? AND status = 'Scheduled'`,
-    [employeeId, id],
-  );
-  return result.affectedRows > 0;
+  return withTransaction(async (connection) => {
+    const [result] = await connection.execute<ResultSetHeader>(
+      `UPDATE appointments
+          SET employee_id = ?
+        WHERE id = ? AND status = 'Scheduled'`,
+      [employeeId, id],
+    );
+    if (!result.affectedRows) return false;
+    await connection.execute(
+      `UPDATE appointment_services
+          SET employee_id = ?
+        WHERE appointment_id = ?`,
+      [employeeId, id],
+    );
+    return true;
+  });
 };
 
 export const assignServiceEmployee = async (appointmentId: number, serviceId: number, employeeId: number): Promise<boolean> => {
@@ -498,7 +535,7 @@ export const assignServiceEmployee = async (appointmentId: number, serviceId: nu
   await pool.execute(
     `UPDATE appointments a
         SET employee_id = (
-          SELECT IF(COUNT(DISTINCT aps.employee_id) = 1, MAX(aps.employee_id), NULL)
+          SELECT IF(COUNT(*) = COUNT(aps.employee_id) AND COUNT(DISTINCT aps.employee_id) = 1, MAX(aps.employee_id), NULL)
             FROM appointment_services aps WHERE aps.appointment_id = a.id
         ) WHERE a.id = ?`,
     [appointmentId],

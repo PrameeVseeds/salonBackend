@@ -31,6 +31,7 @@ export const availableSlots = async (req: Request, res: Response): Promise<void>
                     employeeId: validation.data.employeeId,
                     serviceId: validation.data.serviceId,
                     slots: availability.slots,
+                    slotDetails: availability.slotDetails,
                     availabilityMessage: availability.message,
                 }
             }
