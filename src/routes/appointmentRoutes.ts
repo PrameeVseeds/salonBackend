@@ -11,6 +11,7 @@ router.get("/available-slots", controller.availableSlots);
 router.post("/", authenticateCustomer, controller.create);
 router.get("/my", authenticateCustomer, controller.myAppointments);
 router.patch("/my/:id/cancel", authenticateCustomer, controller.cancelOwned);
+router.get("/today", authenticateUser, authorizeRoles("super_admin", "admin"), controller.todayBoard);
 router.get("/", authenticateUser, authorizeRoles("super_admin", "admin"), controller.getAll);
 router.patch("/:id/start", authenticateUser, authorizeRoles("super_admin", "admin"), controller.start);
 router.patch("/:id/complete", authenticateUser, authorizeRoles("super_admin", "admin"), controller.complete);

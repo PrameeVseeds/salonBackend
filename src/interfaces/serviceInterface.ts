@@ -18,3 +18,11 @@ export interface UpdateServiceInput {
   max_concurrent_appointments: number | null;
 }
 
+export interface SaveSubServiceInput {
+  name: string;
+  duration_minutes: number;
+  price: number;
+  image_url: string;
+  is_active: boolean;
+}
+

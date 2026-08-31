@@ -27,11 +27,11 @@ export const verifyEmailConnection = async (): Promise<void> => {
     await transporter.verify();
 };
 
-export const sendEmail = async (to: string, subject: string, text: string): Promise<void> => {
+export const sendEmail = async (to: string, subject: string, text: string, html?: string): Promise<void> => {
     await transporter.sendMail(
         {
             from: { name: emailFromName, address: emailFromAddress },
-            to, subject, text
+            to, subject, text, ...(html ? { html } : {})
         });
 };
 

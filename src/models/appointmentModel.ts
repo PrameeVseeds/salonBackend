@@ -21,10 +21,12 @@ export interface AppointmentRow extends RowDataPacket {
     employee_name?: string | null;
     service_name?: string;
     service_duration_minutes?: number;
+    can_start?: number | boolean;
     employee_email?: string | null;
     admin_email?: string;
     services?: Array<{
       serviceId: number;
+      subServiceId?: number | null;
       serviceName: string;
       employeeId: number | null;
       employeeName: string | null;

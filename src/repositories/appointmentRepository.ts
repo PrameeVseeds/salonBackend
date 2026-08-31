@@ -45,6 +45,20 @@ export const findActiveServices = async (
     row is appointmentsServiceInterface.AppointmentServiceInfo => Boolean(row));
 };
 
+export const findActiveSubServices = async (
+  subServiceIds: Array<number | null>,
+  db: appointmentsServiceInterface.AppointmentQueryExecutor = pool,
+): Promise<Array<appointmentsServiceInterface.AppointmentSubServiceInfo | null>> => {
+  const ids = subServiceIds.filter((id): id is number => id !== null);
+  if (!ids.length) return subServiceIds.map(() => null);
+  const placeholders = ids.map(() => "?").join(",");
+  const [rows] = await db.execute<appointmentsServiceInterface.AppointmentSubServiceInfo[]>(
+    `SELECT id, service_id, duration_minutes, price, is_active FROM sub_services
+     WHERE is_active = TRUE AND id IN (${placeholders})`, ids,
+  );
+  return subServiceIds.map((id) => id === null ? null : rows.find((row) => row.id === id) ?? null);
+};
+
 export const lockService = async (db: PoolConnection, serviceId: number): Promise<boolean> => {
   const [rows] = await db.execute<import("mysql2").RowDataPacket[]>(
     "SELECT id FROM services WHERE id = ? AND is_active = TRUE FOR UPDATE",
@@ -194,6 +208,26 @@ export const findServiceAppointmentTimeRanges = async (
   return rows;
 };
 
+export const findCustomerAppointmentTimeRanges = async (
+  customerId: number,
+  date: string,
+  excludeAppointmentId?: number,
+  db: appointmentsServiceInterface.AppointmentQueryExecutor = pool,
+): Promise<appointmentsServiceInterface.AppointmentTimeRange[]> => {
+  const exclusion = excludeAppointmentId ? " AND id != ?" : "";
+  const values: Array<number | string> = excludeAppointmentId
+    ? [customerId, date, excludeAppointmentId]
+    : [customerId, date];
+  const [rows] = await db.execute<appointmentsServiceInterface.AppointmentTimeRange[]>(
+    `SELECT start_time, end_time
+       FROM appointments
+      WHERE customer_id = ? AND appointment_date = ?
+        AND status IN ('Scheduled', 'In Progress')${exclusion}`,
+    values,
+  );
+  return rows;
+};
+
 export const findSchedulingSettings = async (
   db: appointmentsServiceInterface.AppointmentQueryExecutor = pool,
 ): Promise<appointmentsServiceInterface.AppointmentSchedulingSettings> => {
@@ -227,19 +261,21 @@ export const findById = async (id: number): Promise<AppointmentRow | null> => {
 
 export const findAppointmentServices = async (appointmentId: number) => {
   const [rows] = await pool.execute<import("mysql2").RowDataPacket[]>(
-    `SELECT aps.service_id AS serviceId, s.name AS serviceName,
+    `SELECT aps.service_id AS serviceId, aps.sub_service_id AS subServiceId,
+            COALESCE(ss.name, s.name) AS serviceName,
             aps.employee_id AS employeeId,
             CASE WHEN e.id IS NULL THEN NULL ELSE CONCAT(e.first_name, ' ', e.last_name) END AS employeeName,
-            s.duration_minutes AS durationMinutes, aps.start_time AS startTime,
+            COALESCE(ss.duration_minutes, s.duration_minutes) AS durationMinutes, aps.start_time AS startTime,
             aps.end_time AS endTime, aps.price
        FROM appointment_services aps
        INNER JOIN services s ON s.id = aps.service_id
+       LEFT JOIN sub_services ss ON ss.id = aps.sub_service_id
        LEFT JOIN employees e ON e.id = aps.employee_id
       WHERE aps.appointment_id = ? ORDER BY aps.sequence_number`,
     [appointmentId],
   );
   return rows.map((row) => ({
-    serviceId: Number(row.serviceId), serviceName: String(row.serviceName),
+    serviceId: Number(row.serviceId), subServiceId: row.subServiceId === null ? null : Number(row.subServiceId), serviceName: String(row.serviceName),
     employeeId: row.employeeId === null ? null : Number(row.employeeId), employeeName: row.employeeName === null ? null : String(row.employeeName),
     durationMinutes: Number(row.durationMinutes), startTime: String(row.startTime), endTime: String(row.endTime), price: Number(row.price),
   }));
@@ -322,6 +358,31 @@ export const findAll = async (filters: AppointmentFilters,): Promise<Appointment
   return rows;
 };
 
+export const findTodayScheduled = async (): Promise<AppointmentRow[]> => {
+  const [rows] = await pool.execute<AppointmentRow[]>(
+    `SELECT a.id, a.start_time, a.end_time, a.total_amount,
+            CURRENT_TIMESTAMP BETWEEN
+              TIMESTAMP(a.appointment_date, a.start_time)
+              AND TIMESTAMP(a.appointment_date, a.end_time) AS can_start,
+            CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
+            COALESCE(
+              GROUP_CONCAT(aps_service.name ORDER BY aps.start_time SEPARATOR ', '),
+              s.name
+            ) AS service_name
+       FROM appointments a
+       INNER JOIN customers c ON c.id = a.customer_id
+       INNER JOIN services s ON s.id = a.service_id
+       LEFT JOIN appointment_services aps ON aps.appointment_id = a.id
+       LEFT JOIN services aps_service ON aps_service.id = aps.service_id
+      WHERE a.appointment_date = CURRENT_DATE
+        AND a.status = 'Scheduled'
+      GROUP BY a.id, a.appointment_date, a.start_time, a.end_time, a.total_amount,
+               c.first_name, c.last_name, s.name
+      ORDER BY a.start_time ASC`,
+  );
+  return rows;
+};
+
 export const findForSchedule = async (employeeId: number, date: string,): Promise<AppointmentRow[]> => {
   const [rows] = await pool.execute<AppointmentRow[]>(
     `SELECT ${fields} 
@@ -356,6 +417,14 @@ export const lockEmployee = async (connection: PoolConnection, employeeId: numbe
         FROM employees 
         WHERE id = ? AND is_active = TRUE FOR UPDATE`,
     [employeeId],
+  );
+  return rows.length > 0;
+};
+
+export const lockCustomer = async (connection: PoolConnection, customerId: number): Promise<boolean> => {
+  const [rows] = await connection.execute<import("mysql2").RowDataPacket[]>(
+    "SELECT id FROM customers WHERE id = ? AND is_active = TRUE FOR UPDATE",
+    [customerId],
   );
   return rows.length > 0;
 };
@@ -412,9 +481,9 @@ export const replaceAppointmentServices = async (
   for (const [index, segment] of segments.entries()) {
     await connection.execute(
       `INSERT INTO appointment_services
-        (appointment_id, service_id, employee_id, sequence_number, start_time, end_time, price)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [appointmentId, segment.serviceId, segment.employeeId, index + 1, segment.startTime, segment.endTime, segment.price],
+        (appointment_id, service_id, sub_service_id, employee_id, sequence_number, start_time, end_time, price)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [appointmentId, segment.serviceId, segment.subServiceId, segment.employeeId, index + 1, segment.startTime, segment.endTime, segment.price],
     );
   }
 };
@@ -477,13 +546,22 @@ export const updateStatus = async (id: number, fromStatus: AppointmentRow["statu
 };
 
 export const assignEmployee = async (id: number, employeeId: number): Promise<boolean> => {
-  const [result] = await pool.execute<ResultSetHeader>(
-    `UPDATE appointments
-        SET employee_id = ?
-      WHERE id = ? AND status = 'Scheduled'`,
-    [employeeId, id],
-  );
-  return result.affectedRows > 0;
+  return withTransaction(async (connection) => {
+    const [result] = await connection.execute<ResultSetHeader>(
+      `UPDATE appointments
+          SET employee_id = ?
+        WHERE id = ? AND status = 'Scheduled'`,
+      [employeeId, id],
+    );
+    if (!result.affectedRows) return false;
+    await connection.execute(
+      `UPDATE appointment_services
+          SET employee_id = ?
+        WHERE appointment_id = ?`,
+      [employeeId, id],
+    );
+    return true;
+  });
 };
 
 export const assignServiceEmployee = async (appointmentId: number, serviceId: number, employeeId: number): Promise<boolean> => {
@@ -498,7 +576,7 @@ export const assignServiceEmployee = async (appointmentId: number, serviceId: nu
   await pool.execute(
     `UPDATE appointments a
         SET employee_id = (
-          SELECT IF(COUNT(DISTINCT aps.employee_id) = 1, MAX(aps.employee_id), NULL)
+          SELECT IF(COUNT(*) = COUNT(aps.employee_id) AND COUNT(DISTINCT aps.employee_id) = 1, MAX(aps.employee_id), NULL)
             FROM appointment_services aps WHERE aps.appointment_id = a.id
         ) WHERE a.id = ?`,
     [appointmentId],

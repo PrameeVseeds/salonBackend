@@ -26,6 +26,30 @@ const toDateKey = (value: unknown): string => {
 const overlaps = (start: number, end: number, range: appointmentInterface.AppointmentTimeRange,): boolean =>
   start < toMinutes(range.end_time) && end > toMinutes(range.start_time);
 
+const MAX_CONCURRENT_CUSTOMER_APPOINTMENTS = 4;
+
+const enforceCustomerAppointmentLimit = async (
+  customerId: number,
+  date: string,
+  start: number,
+  end: number,
+  excludeAppointmentId?: number,
+  db?: appointmentInterface.AppointmentQueryExecutor,
+): Promise<void> => {
+  const ranges = await repository.findCustomerAppointmentTimeRanges(
+    customerId, date, excludeAppointmentId, db,
+  );
+  const relevantRanges = ranges.filter((range) => overlaps(start, end, range));
+  const checkpoints = [start, ...relevantRanges
+    .map((range) => toMinutes(range.start_time))
+    .filter((rangeStart) => rangeStart >= start && rangeStart < end)];
+  const limitReached = checkpoints.some((point) => relevantRanges.filter((range) =>
+    toMinutes(range.start_time) <= point && toMinutes(range.end_time) > point,
+  ).length >= MAX_CONCURRENT_CUSTOMER_APPOINTMENTS);
+  if (limitReached)
+    throw new Error("You can have a maximum of 4 appointments at the same time.");
+};
+
 const weekday = (date: string): string =>
   [
     "Sunday",
@@ -113,17 +137,21 @@ const planServiceSegments = async (
   const services = await repository.findActiveServices(query.serviceIds, db);
   if (services.length !== query.serviceIds.length)
     return null;
+  const subServices = await repository.findActiveSubServices(query.subServiceIds, db);
+  if (subServices.some((item, index) => query.subServiceIds[index] !== null &&
+    (!item || item.service_id !== query.serviceIds[index]))) return null;
   const segments: appointmentInterface.AppointmentServiceSegment[] = [];
   let segmentStart = start;
-  for (const service of services) {
+  for (const [index, service] of services.entries()) {
+    const bookingItem = subServices[index] ?? service;
     const employeeIds = query.employeeId !== null
       ? [query.employeeId]
       : await repository.findActiveEmployeeIdsForService(service.id, db);
     let selectedEmployeeId: number | null = null;
-    const segmentEnd = segmentStart + Number(service.duration_minutes);
+    const segmentEnd = segmentStart + Number(bookingItem.duration_minutes);
     for (const employeeId of employeeIds) {
       const context = await getScheduleContext({
-        date: query.date, serviceId: service.id, serviceIds: [service.id], employeeId,
+        date: query.date, serviceId: service.id, serviceIds: [service.id], subServiceIds: [query.subServiceIds[index] ?? null], employeeId,
       }, excludeAppointmentId, db);
       const serviceBookings = context.serviceAppointments.filter((range) => overlaps(segmentStart, segmentEnd, range)).length;
       if (!context.unavailable && context.capacity > serviceBookings &&
@@ -135,10 +163,11 @@ const planServiceSegments = async (
     if (selectedEmployeeId === null) return null;
     segments.push({
       serviceId: service.id,
+      subServiceId: subServices[index]?.id ?? null,
       employeeId: selectedEmployeeId,
       startTime: toTime(segmentStart),
       endTime: toTime(segmentEnd),
-      price: Number(service.price),
+      price: Number(bookingItem.price),
     });
     segmentStart = segmentEnd;
   }
@@ -147,32 +176,42 @@ const planServiceSegments = async (
 
 export const getAvailability = async (
   query: AvailabilityQuery,
-): Promise<{ slots: string[]; message: string | null }> => {
-  if (query.serviceIds.length > 1) {
+): Promise<{
+  slots: string[];
+  message: string | null;
+  slotDetails: Record<string, { serviceLimit: number; bookedCount: number; availableEmployees: number; remainingCapacity: number; limitingReason: "service_capacity" | "employee_availability" | "both" | null }>;
+}> => {
+  if (query.serviceIds.length > 1 || query.subServiceIds.some(Boolean)) {
     const [firstContext, scheduling, services] = await Promise.all([
       getScheduleContext({ ...query, serviceId: query.serviceIds[0]! }),
       repository.findSchedulingSettings(),
       repository.findActiveServices(query.serviceIds),
     ]);
     if (firstContext.unavailable || !firstContext.workingDay || services.length !== query.serviceIds.length)
-      return { slots: [], message: "The selected services are unavailable." };
+      return { slots: [], message: "The selected services are unavailable.", slotDetails: {} };
 
     const opening = toMinutes(firstContext.workingDay.opening_time);
     const closing = toMinutes(firstContext.workingDay.closing_time);
-    const totalDuration = services.reduce((total, service) => total + Number(service.duration_minutes), 0);
+    const selectedSubServices = await repository.findActiveSubServices(query.subServiceIds);
+    if (selectedSubServices.some((item, index) => query.subServiceIds[index] !== null && (!item || item.service_id !== query.serviceIds[index])))
+      return { slots: [], message: "A selected sub-service is unavailable.", slotDetails: {} };
+    const totalDuration = services.reduce((total, service, index) => total + Number(selectedSubServices[index]?.duration_minutes ?? service.duration_minutes), 0);
     const buffer = Number(scheduling.appointment_buffer_minutes);
     const slotStep = totalDuration + buffer;
     const slots: string[] = [];
+    const slotDetails: Record<string, { serviceLimit: number; bookedCount: number; availableEmployees: number; remainingCapacity: number; limitingReason: "service_capacity" | "employee_availability" | "both" | null }> = {};
     for (let start = opening; start + slotStep <= closing; start += slotStep) {
       if (isPastOrCurrentTime(query.date, toTime(start)))
         continue;
 
-      if (await planServiceSegments(query, start))
+      if (await planServiceSegments(query, start)) {
         slots.push(toTime(start));
+        slotDetails[toTime(start)] = { serviceLimit: 1, bookedCount: 0, availableEmployees: 1, remainingCapacity: 1, limitingReason: null };
+      }
     }
     return {
       slots, message: slots.length ? null :
-        "No professional combination is available for all selected services."
+        "No professional combination is available for all selected services.", slotDetails,
     };
   }
   const [context, scheduling, assignedEmployeeIds] = await Promise.all([
@@ -184,7 +223,7 @@ export const getAvailability = async (
   ]);
 
   if (context.unavailable || !context.workingDay)
-    return { slots: [], message: context.unavailableReason ?? "The salon is unavailable on this date." };
+    return { slots: [], message: context.unavailableReason ?? "The salon is unavailable on this date.", slotDetails: {} };
 
   const opening = toMinutes(context.workingDay.opening_time);
   const closing = toMinutes(context.workingDay.closing_time);
@@ -192,6 +231,7 @@ export const getAvailability = async (
   const buffer = Number(scheduling.appointment_buffer_minutes);
   const slotStep = duration + buffer;
   const slots: string[] = [];
+  const slotDetails: Record<string, { serviceLimit: number; bookedCount: number; availableEmployees: number; remainingCapacity: number; limitingReason: "service_capacity" | "employee_availability" | "both" | null }> = {};
   const employeeContexts = assignedEmployeeIds.length
     ? await Promise.all(
       assignedEmployeeIds.map((employeeId) =>
@@ -212,25 +252,37 @@ export const getAvailability = async (
     const salonIsAvailable = !context.blocked.some((range) =>
       overlaps(start, start + duration + buffer, range),
     );
-    const professionalIsAvailable = employeeContexts.length === 0
-      ? true
-      : employeeContexts.some((employeeContext) =>
+    const availableEmployees = employeeContexts.filter((employeeContext) =>
         !employeeContext.unavailable &&
         !employeeContext.blocked.some((range) =>
           overlaps(start, start + duration + buffer, range),
-        ),
-      );
+        )).length;
+    const professionalIsAvailable = availableEmployees > 0;
+    const serviceRemaining = Math.max(0, context.capacity - serviceBookings);
+    const remainingCapacity = Math.min(serviceRemaining, availableEmployees);
+    const limitingReason = remainingCapacity <= 0
+      ? serviceRemaining <= 0 && availableEmployees <= 0 ? "both" : serviceRemaining <= 0 ? "service_capacity" : "employee_availability"
+      : serviceRemaining === availableEmployees ? "both" : serviceRemaining < availableEmployees ? "service_capacity" : "employee_availability";
     if (
       context.capacity > 0 &&
       serviceBookings < context.capacity &&
       salonIsAvailable &&
       professionalIsAvailable
-    )
+    ) {
       slots.push(toTime(start));
+      slotDetails[toTime(start)] = {
+        serviceLimit: context.capacity,
+        bookedCount: serviceBookings,
+        availableEmployees,
+        remainingCapacity,
+        limitingReason,
+      };
+    }
   }
   return {
     slots,
     message: slots.length ? null : "All appointment times are booked for this date.",
+    slotDetails,
   };
 };
 
@@ -239,6 +291,8 @@ export const getAvailableSlots = async (query: AvailabilityQuery): Promise<strin
 
 const saveAppointment = async (customerId: number, input: AppointmentRequest, appointmentId?: number): Promise<AppointmentRow> => {
   const id = await repository.withTransaction(async (connection) => {
+    if (!(await repository.lockCustomer(connection, customerId)))
+      throw new Error("Customer not found or inactive.");
     if (appointmentId && !(await repository.lockOwnedAppointment(
       connection,
       appointmentId,
@@ -254,27 +308,33 @@ const saveAppointment = async (customerId: number, input: AppointmentRequest, ap
     const candidates: Array<number | null> = input.employeeId ? [input.employeeId] : [null];
     const scheduling = await repository.findSchedulingSettings(connection);
     const start = toMinutes(input.startTime);
-    if (input.serviceIds.length > 1) {
+    if (input.serviceIds.length > 1 || input.subServiceIds.some(Boolean)) {
       for (const serviceId of input.serviceIds.slice(1))
         if (!(await repository.lockService(connection, serviceId))) throw new Error("Service not found or inactive.");
       if (isPastOrCurrentTime(input.appointmentDate, toTime(start)))
         throw new Error("The selected appointment slot is no longer available.");
       const firstContext = await getScheduleContext({
-        date: input.appointmentDate, serviceId: input.serviceIds[0]!, serviceIds: input.serviceIds, employeeId: input.employeeId,
+        date: input.appointmentDate, serviceId: input.serviceIds[0]!, serviceIds: input.serviceIds, subServiceIds: input.subServiceIds, employeeId: input.employeeId,
       }, appointmentId, connection);
       const services = await repository.findActiveServices(input.serviceIds, connection);
-      const totalDuration = services.reduce((total, service) => total + Number(service.duration_minutes), 0);
+      const selectedSubServices = await repository.findActiveSubServices(input.subServiceIds, connection);
+      if (selectedSubServices.some((item, index) => input.subServiceIds[index] !== null && (!item || item.service_id !== input.serviceIds[index])))
+        throw new Error("A selected sub-service is unavailable.");
+      const totalDuration = services.reduce((total, service, index) => total + Number(selectedSubServices[index]?.duration_minutes ?? service.duration_minutes), 0);
       const slotStep = totalDuration + Number(scheduling.appointment_buffer_minutes);
       if (services.length !== input.serviceIds.length || !firstContext.workingDay ||
         (start - toMinutes(firstContext.workingDay.opening_time)) % slotStep !== 0)
         throw new Error("The selected appointment slot is no longer available.");
       const segments = await planServiceSegments({
-        date: input.appointmentDate, serviceId: input.serviceIds[0]!, serviceIds: input.serviceIds, employeeId: input.employeeId,
+        date: input.appointmentDate, serviceId: input.serviceIds[0]!, serviceIds: input.serviceIds, subServiceIds: input.subServiceIds, employeeId: input.employeeId,
       }, start, appointmentId, connection);
       if (!segments?.length) throw new Error("The selected appointment slot is no longer available.");
       const finalEnd = toMinutes(segments.at(-1)!.endTime);
       if (finalEnd + Number(scheduling.appointment_buffer_minutes) > toMinutes(firstContext.workingDay.closing_time))
         throw new Error("The selected appointment slot is no longer available.");
+      await enforceCustomerAppointmentLimit(
+        customerId, input.appointmentDate, start, finalEnd, appointmentId, connection,
+      );
       const employeeIds = [...new Set(segments.map((segment) => segment.employeeId))];
       const values = {
         employeeId: employeeIds.length === 1 ? employeeIds[0]! : null,
@@ -295,7 +355,7 @@ const saveAppointment = async (customerId: number, input: AppointmentRequest, ap
 
     for (const candidateId of candidates) {
       if (candidateId !== null && !(await repository.lockEmployee(connection, candidateId))) continue;
-      const context = await getScheduleContext({ date: input.appointmentDate, serviceId: input.serviceId, serviceIds: [input.serviceId], employeeId: candidateId }, appointmentId, connection);
+      const context = await getScheduleContext({ date: input.appointmentDate, serviceId: input.serviceId, serviceIds: [input.serviceId], subServiceIds: [null], employeeId: candidateId }, appointmentId, connection);
       if (context.unavailable || !context.workingDay) continue;
       const end = start + Number(context.service.duration_minutes);
       const bufferedEnd = end + Number(scheduling.appointment_buffer_minutes);
@@ -319,6 +379,9 @@ const saveAppointment = async (customerId: number, input: AppointmentRequest, ap
       throw new Error("The selected appointment slot is no longer available.");
 
     const end = start + Number(selectedContext.service.duration_minutes);
+    await enforceCustomerAppointmentLimit(
+      customerId, input.appointmentDate, start, end, appointmentId, connection,
+    );
 
     const values = {
       employeeId: selectedEmployeeId,
@@ -345,6 +408,7 @@ const saveAppointment = async (customerId: number, input: AppointmentRequest, ap
     } else savedId = await repository.insert(connection, { customerId, ...values });
     await repository.replaceAppointmentServices(connection, savedId, [{
       serviceId: input.serviceId,
+      subServiceId: null,
       employeeId: selectedEmployeeId!,
       startTime: values.startTime,
       endTime: values.endTime,
@@ -377,6 +441,8 @@ export const deleteOwnedAppointment = (id: number, customerId: number) =>
 export const getAllAppointments = (filters: AppointmentFilters) =>
   repository.findAll(filters).then(repository.attachAppointmentServices);
 
+export const getTodayAppointmentBoard = () => repository.findTodayScheduled();
+
 export const assignEmployeeToAppointment = async (id: number, employeeId: number, serviceId?: number): Promise<AppointmentRow> => {
   const appointment = await repository.findById(id);
   if (!appointment) throw new Error("Appointment not found.");
@@ -394,6 +460,7 @@ export const assignEmployeeToAppointment = async (id: number, employeeId: number
     date: toDateKey(appointment.appointment_date),
     serviceId: targetServiceId,
     serviceIds: [targetServiceId],
+    subServiceIds: [null],
     employeeId,
   }, appointment.id);
   const start = toMinutes(targetStartTime);
@@ -428,6 +495,7 @@ export const getAvailableEmployeeIdsForAppointment = async (id: number, serviceI
       date,
       serviceId: targetServiceId,
       serviceIds: [targetServiceId],
+      subServiceIds: [null],
       employeeId,
     }, appointment.id);
     return !context.unavailable && !context.blocked.some((range) => overlaps(start, end, range))
