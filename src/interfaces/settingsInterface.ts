@@ -3,6 +3,7 @@ export interface SettingsInput {
   phone: string;
   email: string;
   address: string;
+  map_url: string | null;
   facebook_url: string | null;
   instagram_url: string | null;
   whatsapp_number: string | null;

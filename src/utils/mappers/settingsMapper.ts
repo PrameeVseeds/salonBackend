@@ -6,6 +6,7 @@ export const formatSettings = (settings: SettingsRow) => ({
   phone: settings.phone,
   email: settings.email,
   address: settings.address,
+  mapUrl: settings.map_url,
   logoUrl: settings.logo_url,
   facebookUrl: settings.facebook_url,
   instagramUrl: settings.instagram_url,
