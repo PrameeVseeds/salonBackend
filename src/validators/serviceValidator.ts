@@ -1,4 +1,4 @@
-import type {RegisterServiceInput,UpdateServiceInput,} from "../interfaces/serviceInterface.js";
+import type { RegisterServiceInput, UpdateServiceInput, } from "../interfaces/serviceInterface.js";
 import { getString, type ValidationResult } from "./validationUtils.js";
 
 const getPositiveNumber = (value: unknown): number | null => {
@@ -11,6 +11,7 @@ const getPositiveNumber = (value: unknown): number | null => {
 
 const validateServicePayload = (body: Record<string, unknown>,): ValidationResult<RegisterServiceInput> => {
     const name = getString(body.name);
+    const categoryId = Number(body.category_id ?? body.categoryId);
     const description = getString(body.description);
     const durationMinutes = getPositiveNumber(
         body.duration_minutes ?? body.durationMinutes,
@@ -27,6 +28,13 @@ const validateServicePayload = (body: Record<string, unknown>,): ValidationResul
         return {
             isValid: false,
             message: "Name, description and image URL are required.",
+        };
+    }
+
+    if (!Number.isInteger(categoryId) || categoryId <= 0) {
+        return {
+            isValid: false,
+            message: "A valid service category is required."
         };
     }
 
@@ -61,6 +69,7 @@ const validateServicePayload = (body: Record<string, unknown>,): ValidationResul
     return {
         isValid: true,
         data: {
+            category_id: categoryId,
             name,
             description,
             duration_minutes: durationMinutes,

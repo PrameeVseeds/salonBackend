@@ -76,6 +76,7 @@ export const validateSettings = (body: Record<string, unknown>,): ValidationResu
       phone,
       email,
       address,
+      map_url: getString(body.mapUrl ?? body.map_url),
       facebook_url: getString(body.facebookUrl ?? body.facebook_url),
       instagram_url: getString(body.instagramUrl ?? body.instagram_url),
       whatsapp_number: getString(body.whatsappNumber ?? body.whatsapp_number),

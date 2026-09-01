@@ -461,6 +461,7 @@ CREATE TABLE `settings` (
   `phone` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
   `email` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
   `address` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `map_url` varchar(2048) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `logo_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `facebook_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `instagram_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,

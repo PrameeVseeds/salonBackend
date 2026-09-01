@@ -5,7 +5,9 @@ import type { ServiceRow } from "../models/serviceModel.js";
 import type { SubServiceRow } from "../models/subServiceModel.js";
 
 const serviceSelectFields =
-    `services.id, services.name, services.description, services.duration_minutes, services.price,
+    `services.id, services.category_id, service_categories.name AS category_name,
+     service_categories.is_active AS category_is_active,
+     services.name, services.description, services.duration_minutes, services.price,
      services.image_url, services.is_active, services.max_concurrent_appointments,
      services.created_at, services.updated_at,
      (SELECT COUNT(*) 
@@ -18,7 +20,8 @@ export const findServiceById = async (serviceId: number): Promise<ServiceRow | n
     const [rows] = await pool.execute<ServiceRow[]>(
         `SELECT ${serviceSelectFields}
          FROM services
-         WHERE id = ?
+         INNER JOIN service_categories ON service_categories.id = services.category_id
+         WHERE services.id = ?
          LIMIT 1`,
         [serviceId],
     );
@@ -32,7 +35,8 @@ export const findAllServices = async (): Promise<ServiceRow[]> => {
     const [rows] = await pool.execute<ServiceRow[]>(
         `SELECT ${serviceSelectFields}
          FROM services
-         ORDER BY created_at DESC`,
+         INNER JOIN service_categories ON service_categories.id = services.category_id
+         ORDER BY service_categories.name, services.name`,
     );
 
     const subServices = await findAllSubServices();
@@ -87,7 +91,8 @@ export const findServiceByName = async (name: string): Promise<ServiceRow | null
     const [rows] = await pool.execute<ServiceRow[]>(
         `SELECT ${serviceSelectFields}
          FROM services
-         WHERE LOWER(name) = LOWER(?)
+         INNER JOIN service_categories ON service_categories.id = services.category_id
+         WHERE LOWER(services.name) = LOWER(?)
          LIMIT 1`,
         [name],
     );
@@ -110,9 +115,10 @@ export const serviceNameExistsForAnotherService = async (name: string,serviceId:
 export const createService = async (input: RegisterServiceInput): Promise<ServiceRow | null> => {
     const [result] = await pool.execute<ResultSetHeader>(
         `INSERT INTO services
-            (name, description, duration_minutes, price, image_url, is_active, max_concurrent_appointments)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            (category_id, name, description, duration_minutes, price, image_url, is_active, max_concurrent_appointments)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
+            input.category_id,
             input.name,
             input.description,
             input.duration_minutes,
@@ -130,6 +136,7 @@ export const updateService = async (serviceId: number,input: UpdateServiceInput,
     const [result] = await pool.execute<ResultSetHeader>(
         `UPDATE services
          SET name = ?,
+             category_id = ?,
              description = ?,
              duration_minutes = ?,
              price = ?,
@@ -139,6 +146,7 @@ export const updateService = async (serviceId: number,input: UpdateServiceInput,
          WHERE id = ?`,
         [
             input.name,
+            input.category_id,
             input.description,
             input.duration_minutes,
             input.price,

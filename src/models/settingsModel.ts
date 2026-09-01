@@ -6,6 +6,7 @@ export interface SettingsRow extends RowDataPacket {
   phone: string;
   email: string;
   address: string;
+  map_url: string | null;
   logo_url: string | null;
   facebook_url: string | null;
   instagram_url: string | null;

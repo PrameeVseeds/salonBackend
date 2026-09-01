@@ -1,4 +1,5 @@
 export interface RegisterServiceInput {
+  category_id: number;
   name: string;
   description: string;
   duration_minutes: number;
@@ -9,6 +10,7 @@ export interface RegisterServiceInput {
 }
 
 export interface UpdateServiceInput {
+  category_id: number;
   name: string;
   description: string;
   duration_minutes: number;
