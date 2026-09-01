@@ -2,6 +2,9 @@ import { ServiceRow } from "../../models/serviceModel.js";
 
 export const formatService = (service: ServiceRow) => ({
     id: service.id,
+    categoryId: service.category_id,
+    categoryName: service.category_name,
+    categoryIsActive: Boolean(service.category_is_active),
     name: service.name,
     description: service.description ?? "",
     durationMinutes: service.duration_minutes,

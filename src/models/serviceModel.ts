@@ -3,6 +3,9 @@ import type { SubServiceRow } from "./subServiceModel.js";
 
 export interface ServiceRow extends RowDataPacket {
     id: number;
+    category_id: number;
+    category_name: string;
+    category_is_active: boolean;
     name: string;
     description: string;
     duration_minutes: number;
