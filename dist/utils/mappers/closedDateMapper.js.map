@@ -1,0 +1,1 @@
+{"version":3,"file":"closedDateMapper.js","sourceRoot":"","sources":["../../../src/utils/mappers/closedDateMapper.ts"],"names":[],"mappings":"AAEA,MAAM,CAAC,MAAM,gBAAgB,GAAG,CAAC,UAAyB,EAAE,EAAE,CAAC,CAAC;IAC5D,EAAE,EAAE,UAAU,CAAC,EAAE;IACjB,UAAU,EAAE,UAAU,CAAC,WAAW;IAClC,MAAM,EAAE,UAAU,CAAC,MAAM;IACzB,SAAS,EAAE,UAAU,CAAC,UAAU;IAChC,SAAS,EAAE,UAAU,CAAC,UAAU;CACnC,CAAC,CAAC"}

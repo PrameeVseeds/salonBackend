@@ -1,0 +1,10 @@
+import jwt from "jsonwebtoken";
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret) {
+    throw new Error("JWT_SECRET environment variable is not defined");
+}
+const expiresIn = process.env.JWT_EXPIRES_IN || "1d";
+export const generateToken = (payload) => {
+    return jwt.sign(payload, jwtSecret, { expiresIn, });
+};
+//# sourceMappingURL=jwtHelper.js.map

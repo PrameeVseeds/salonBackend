@@ -1,0 +1,21 @@
+export const formatSettings = (settings) => ({
+    id: settings.id,
+    salonName: settings.salon_name,
+    phone: settings.phone,
+    email: settings.email,
+    address: settings.address,
+    mapUrl: settings.map_url,
+    logoUrl: settings.logo_url,
+    facebookUrl: settings.facebook_url,
+    instagramUrl: settings.instagram_url,
+    whatsappNumber: settings.whatsapp_number,
+    allowCustomerChooseEmployee: Boolean(settings.allow_customer_choose_employee),
+    enableOnlinePayment: Boolean(settings.enable_online_payment),
+    bookingIntervalMinutes: settings.booking_interval_minutes,
+    appointmentBufferMinutes: settings.appointment_buffer_minutes,
+    appointmentGracePeriodMinutes: settings.appointment_grace_period_minutes,
+    appointmentReminderMinutes: settings.appointment_reminder_minutes,
+    createdAt: settings.created_at,
+    updatedAt: settings.updated_at,
+});
+//# sourceMappingURL=settingsMapper.js.map

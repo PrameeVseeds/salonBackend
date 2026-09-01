@@ -1,0 +1,6 @@
+import { Router } from "express";
+import { submitSupportRequest } from "../controllers/supportController.js";
+const router = Router();
+router.post("/contact", submitSupportRequest);
+export default router;
+//# sourceMappingURL=supportRoutes.js.map
