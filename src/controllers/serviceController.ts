@@ -179,8 +179,9 @@ export const deleteService = async (req: Request<{ id: string }>, res: Response,
         }
 
         res.status(200).json({ success: true, message: "Service deleted successfully." });
-    } catch {
-        res.status(500).json({ success: false, message: "Failed to delete service." });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to delete service.";
+        res.status(message.includes("existing appointments") ? 409 : 500).json({ success: false, message });
     }
 };
 

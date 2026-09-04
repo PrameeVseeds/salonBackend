@@ -1,4 +1,4 @@
-import type { ResultSetHeader } from "mysql2";
+import type { ResultSetHeader, RowDataPacket } from "mysql2";
 import { pool } from "../config/db.js";
 import type {RegisterServiceInput, SaveSubServiceInput, UpdateServiceInput,} from "../interfaces/serviceInterface.js";
 import type { ServiceRow } from "../models/serviceModel.js";
@@ -169,11 +169,36 @@ export const updateServiceStatus = async (serviceId: number,isActive: boolean,):
     return result.affectedRows > 0;
 };
 
-export const deleteService = async (serviceId: number): Promise<boolean> => {
-    const [result] = await pool.execute<ResultSetHeader>(
-        "DELETE FROM services WHERE id = ?",
-        [serviceId],
+export const hasAppointmentsForService = async (serviceId: number): Promise<boolean> => {
+    const [rows] = await pool.execute<Array<RowDataPacket & { has_appointments: number }>>(
+        `SELECT EXISTS (
+            SELECT 1 FROM appointments WHERE service_id = ?
+            UNION ALL
+            SELECT 1 FROM appointment_services WHERE service_id = ?
+            LIMIT 1
+        ) AS has_appointments`,
+        [serviceId, serviceId],
     );
 
-    return result.affectedRows > 0;
+    return Boolean(rows[0]?.has_appointments);
+};
+
+export const deleteService = async (serviceId: number): Promise<boolean> => {
+    const connection = await pool.getConnection();
+
+    try {
+        await connection.beginTransaction();
+        await connection.execute("DELETE FROM sub_services WHERE service_id = ?", [serviceId]);
+        const [result] = await connection.execute<ResultSetHeader>(
+            "DELETE FROM services WHERE id = ?",
+            [serviceId],
+        );
+        await connection.commit();
+        return result.affectedRows > 0;
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
 };

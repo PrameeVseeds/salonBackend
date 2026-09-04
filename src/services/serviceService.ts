@@ -55,6 +55,10 @@ export const deleteServiceById = async (serviceId: number): Promise<boolean> => 
         return false;
     }
 
+    if (await serviceRepository.hasAppointmentsForService(serviceId)) {
+        throw new Error("Cannot delete a service that has existing appointments. Deactivate it instead.");
+    }
+
     return serviceRepository.deleteService(serviceId);
 };
 
