@@ -1,4 +1,4 @@
-import type { AppointmentFilters, AppointmentRequest, AvailabilityQuery } from "../interfaces/appointmentInterface.js";
+import type { AdminAppointmentRequest, AppointmentFilters, AppointmentRequest, AvailabilityQuery } from "../interfaces/appointmentInterface.js";
 import * as appointmentInterface from "../interfaces/appointmentServiceInterface.js";
 import type { AppointmentRow } from "../models/appointmentModel.js";
 import * as repository from "../repositories/appointmentRepository.js";
@@ -48,6 +48,14 @@ const enforceCustomerAppointmentLimit = async (
   ).length >= MAX_CONCURRENT_CUSTOMER_APPOINTMENTS);
   if (limitReached)
     throw new Error("You can have a maximum of 4 appointments at the same time.");
+};
+
+const isWithinBookingWindow = (date: string): boolean => {
+  const today = new Date();
+  const first = toDateKey(today);
+  const lastDate = new Date(today);
+  lastDate.setDate(lastDate.getDate() + 3);
+  return date >= first && date <= toDateKey(lastDate);
 };
 
 const weekday = (date: string): string =>
@@ -181,6 +189,8 @@ export const getAvailability = async (
   message: string | null;
   slotDetails: Record<string, { serviceLimit: number; bookedCount: number; availableEmployees: number; remainingCapacity: number; limitingReason: "service_capacity" | "employee_availability" | "both" | null }>;
 }> => {
+  if (!isWithinBookingWindow(query.date))
+    return { slots: [], message: "Appointments can only be booked from today through the next three days.", slotDetails: {} };
   if (query.serviceIds.length > 1 || query.subServiceIds.some(Boolean)) {
     const [firstContext, scheduling, services] = await Promise.all([
       getScheduleContext({ ...query, serviceId: query.serviceIds[0]! }),
@@ -289,14 +299,16 @@ export const getAvailability = async (
 export const getAvailableSlots = async (query: AvailabilityQuery): Promise<string[]> =>
   (await getAvailability(query)).slots;
 
-const saveAppointment = async (customerId: number, input: AppointmentRequest, appointmentId?: number): Promise<AppointmentRow> => {
+const saveAppointment = async (customerId: number | null, input: AppointmentRequest, appointmentId?: number, adminCustomer?: Pick<AdminAppointmentRequest, "customerName" | "customerPhone">): Promise<AppointmentRow> => {
+  if (!isWithinBookingWindow(input.appointmentDate))
+    throw new Error("Appointments can only be booked from today through the next three days.");
   const id = await repository.withTransaction(async (connection) => {
-    if (!(await repository.lockCustomer(connection, customerId)))
+    if (customerId !== null && !(await repository.lockCustomer(connection, customerId)))
       throw new Error("Customer not found or inactive.");
     if (appointmentId && !(await repository.lockOwnedAppointment(
       connection,
       appointmentId,
-      customerId,
+      customerId!,
     ))
     ) {
       throw new Error("Appointment not found.");
@@ -332,9 +344,8 @@ const saveAppointment = async (customerId: number, input: AppointmentRequest, ap
       const finalEnd = toMinutes(segments.at(-1)!.endTime);
       if (finalEnd + Number(scheduling.appointment_buffer_minutes) > toMinutes(firstContext.workingDay.closing_time))
         throw new Error("The selected appointment slot is no longer available.");
-      await enforceCustomerAppointmentLimit(
-        customerId, input.appointmentDate, start, finalEnd, appointmentId, connection,
-      );
+      if (customerId !== null)
+        await enforceCustomerAppointmentLimit(customerId, input.appointmentDate, start, finalEnd, appointmentId, connection);
       const employeeIds = [...new Set(segments.map((segment) => segment.employeeId))];
       const values = {
         employeeId: employeeIds.length === 1 ? employeeIds[0]! : null,
@@ -344,9 +355,9 @@ const saveAppointment = async (customerId: number, input: AppointmentRequest, ap
       };
       let savedId: number;
       if (appointmentId) {
-        if (!(await repository.updateOwned(connection, appointmentId, customerId, values))) throw new Error("Appointment not found.");
+        if (!(await repository.updateOwned(connection, appointmentId, customerId!, values))) throw new Error("Appointment not found.");
         savedId = appointmentId;
-      } else savedId = await repository.insert(connection, { customerId, ...values });
+      } else savedId = await repository.insert(connection, { customerId, customerName: adminCustomer?.customerName ?? null, customerPhone: adminCustomer?.customerPhone ?? null, ...values });
       await repository.replaceAppointmentServices(connection, savedId, segments);
       return savedId;
     }
@@ -379,9 +390,8 @@ const saveAppointment = async (customerId: number, input: AppointmentRequest, ap
       throw new Error("The selected appointment slot is no longer available.");
 
     const end = start + Number(selectedContext.service.duration_minutes);
-    await enforceCustomerAppointmentLimit(
-      customerId, input.appointmentDate, start, end, appointmentId, connection,
-    );
+    if (customerId !== null)
+      await enforceCustomerAppointmentLimit(customerId, input.appointmentDate, start, end, appointmentId, connection);
 
     const values = {
       employeeId: selectedEmployeeId,
@@ -399,13 +409,13 @@ const saveAppointment = async (customerId: number, input: AppointmentRequest, ap
         !(await repository.updateOwned(
           connection,
           appointmentId,
-          customerId,
+          customerId!,
           values,
         ))
       )
         throw new Error("Appointment not found.");
       savedId = appointmentId;
-    } else savedId = await repository.insert(connection, { customerId, ...values });
+    } else savedId = await repository.insert(connection, { customerId, customerName: adminCustomer?.customerName ?? null, customerPhone: adminCustomer?.customerPhone ?? null, ...values });
     await repository.replaceAppointmentServices(connection, savedId, [{
       serviceId: input.serviceId,
       subServiceId: null,
@@ -430,6 +440,9 @@ export const createAppointment = async (customerId: number, input: AppointmentRe
   );
   return appointment;
 };
+
+export const createAdminAppointment = (input: AdminAppointmentRequest): Promise<AppointmentRow> =>
+  saveAppointment(null, input, undefined, input);
 
 export const updateAppointment = (id: number, customerId: number, input: AppointmentRequest) => saveAppointment(customerId, input, id);
 export const getMyAppointments = (customerId: number) =>

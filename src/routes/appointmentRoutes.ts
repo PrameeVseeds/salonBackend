@@ -9,6 +9,7 @@ const router = Router();
 
 router.get("/available-slots", controller.availableSlots);
 router.post("/", authenticateCustomer, controller.create);
+router.post("/admin", authenticateUser, authorizeRoles("super_admin", "admin"), controller.createAdmin);
 router.get("/my", authenticateCustomer, controller.myAppointments);
 router.patch("/my/:id/cancel", authenticateCustomer, controller.cancelOwned);
 router.get("/today", authenticateUser, authorizeRoles("super_admin", "admin"), controller.todayBoard);

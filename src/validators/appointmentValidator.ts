@@ -1,4 +1,4 @@
-import type { AppointmentFilters, AppointmentRequest, AvailabilityQuery } from "../interfaces/appointmentInterface.js";
+import type { AdminAppointmentRequest, AppointmentFilters, AppointmentRequest, AvailabilityQuery } from "../interfaces/appointmentInterface.js";
 import { getString, type ValidationResult } from "./validationUtils.js";
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -56,6 +56,18 @@ export const validateAppointmentRequest = (body: Record<string, unknown>): Valid
         isValid: true,
         data: { employeeId, serviceId, serviceIds, subServiceIds, appointmentDate, startTime, notes: getString(body.notes) }
     };
+};
+
+export const validateAdminAppointmentRequest = (body: Record<string, unknown>): ValidationResult<AdminAppointmentRequest> => {
+    const appointment = validateAppointmentRequest(body);
+    if (!appointment.isValid) return appointment;
+    const customerName = getString(body.customerName)?.trim();
+    const customerPhone = getString(body.customerPhone)?.trim() || null;
+    if (!customerName || customerName.length > 255)
+        return { isValid: false, message: "Customer name is required and must not exceed 255 characters." };
+    if (customerPhone && customerPhone.length > 30)
+        return { isValid: false, message: "Phone number must not exceed 30 characters." };
+    return { isValid: true, data: { ...appointment.data, customerName, customerPhone } };
 };
 
 export const validateAvailabilityQuery = (query: Record<string, unknown>): ValidationResult<AvailabilityQuery> => {

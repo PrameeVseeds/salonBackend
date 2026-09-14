@@ -3,7 +3,7 @@ import type { CustomerAuthRequest } from "../middleware/customerAuthMiddleware.j
 import * as service from "../services/appointmentService.js";
 import { formatAppointment } from "../utils/mappers/appointmentMapper.js";
 import { sendBadRequest } from "../utils/responseHelper.js";
-import { validateAppointmentFilters, validateAppointmentId, validateAppointmentRequest, validateAvailabilityQuery } from "../validators/appointmentValidator.js";
+import { validateAdminAppointmentRequest, validateAppointmentFilters, validateAppointmentId, validateAppointmentRequest, validateAvailabilityQuery } from "../validators/appointmentValidator.js";
 
 const customerId = (req: CustomerAuthRequest): number => req.customer!.id;
 
@@ -58,6 +58,21 @@ export const create = async (req: CustomerAuthRequest, res: Response): Promise<v
     }
     catch (error) {
         errorResponse(res, error, "Failed to create appointment.");
+    }
+};
+
+export const createAdmin = async (req: Request, res: Response): Promise<void> => {
+    const validation = validateAdminAppointmentRequest(req.body ?? {});
+    if (!validation.isValid) return sendBadRequest(res, validation.message);
+    try {
+        const appointment = await service.createAdminAppointment(validation.data);
+        res.status(201).json({
+            success: true,
+            message: "Admin appointment created successfully.",
+            data: { appointment: formatAppointment(appointment) },
+        });
+    } catch (error) {
+        errorResponse(res, error, "Failed to create admin appointment.");
     }
 };
 

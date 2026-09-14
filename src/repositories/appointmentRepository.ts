@@ -7,9 +7,11 @@ import type { AppointmentRow } from "../models/appointmentModel.js";
 const fields = `id, customer_id, employee_id, service_id, appointment_date, 
 start_time, end_time, total_amount, notes, status, started_at, completed_at,
 cancelled_at, cancellation_reason, created_at, updated_at`;
-const customerDetailFields = `a.id, a.customer_id, a.employee_id, a.service_id, a.appointment_date,
+const customerDetailFields = `a.id, a.customer_id, a.manual_customer_name, a.manual_customer_phone, a.employee_id, a.service_id, a.appointment_date,
   a.start_time, a.end_time, a.total_amount, a.notes, a.status, a.started_at, a.completed_at,
   a.cancelled_at, a.cancellation_reason, a.created_at, a.updated_at,
+  COALESCE(CONCAT(c.first_name, ' ', c.last_name), a.manual_customer_name) AS customer_name,
+  COALESCE(c.phone, a.manual_customer_phone) AS customer_phone, c.email AS customer_email,
   CASE WHEN e.id IS NULL THEN NULL ELSE CONCAT(e.first_name, ' ', e.last_name) END AS employee_name,
   s.name AS service_name, s.duration_minutes AS service_duration_minutes`;
 
@@ -251,6 +253,7 @@ export const findById = async (id: number): Promise<AppointmentRow | null> => {
   const [rows] = await pool.execute<AppointmentRow[]>(
     `SELECT ${customerDetailFields}
         FROM appointments a
+        LEFT JOIN customers c ON c.id = a.customer_id
         LEFT JOIN employees e ON e.id = a.employee_id
         INNER JOIN services s ON s.id = a.service_id
         WHERE a.id = ?
@@ -291,6 +294,7 @@ export const findOwnedById = async (id: number, customerId: number): Promise<App
     (
       `SELECT ${customerDetailFields}
         FROM appointments a
+        LEFT JOIN customers c ON c.id = a.customer_id
         LEFT JOIN employees e ON e.id = a.employee_id
         INNER JOIN services s ON s.id = a.service_id
         WHERE a.id = ? AND a.customer_id = ?
@@ -300,8 +304,9 @@ export const findOwnedById = async (id: number, customerId: number): Promise<App
 
 export const findByCustomer = async (customerId: number,): Promise<AppointmentRow[]> => {
   const [rows] = await pool.execute<AppointmentRow[]>(
-    `SELECT ${customerDetailFields}
+      `SELECT ${customerDetailFields}
         FROM appointments a
+        LEFT JOIN customers c ON c.id = a.customer_id
         LEFT JOIN employees e ON e.id = a.employee_id
         INNER JOIN services s ON s.id = a.service_id
         WHERE a.customer_id = ?
@@ -333,23 +338,23 @@ export const findAll = async (filters: AppointmentFilters,): Promise<Appointment
     values.push(filters.status);
   }
   if (filters.search) {
-    conditions.push("(CONCAT(c.first_name, ' ', c.last_name) LIKE ? OR c.phone LIKE ? OR c.email LIKE ?)");
+    conditions.push("(CONCAT(c.first_name, ' ', c.last_name) LIKE ? OR a.manual_customer_name LIKE ? OR c.phone LIKE ? OR a.manual_customer_phone LIKE ? OR c.email LIKE ?)");
     const term = `%${filters.search}%`;
-    values.push(term, term, term);
+    values.push(term, term, term, term, term);
   }
 
   const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
 
   const [rows] = await pool.execute<AppointmentRow[]>(
-    `SELECT a.id, a.customer_id, a.employee_id, a.service_id, a.appointment_date,
+    `SELECT a.id, a.customer_id, a.manual_customer_name, a.manual_customer_phone, a.employee_id, a.service_id, a.appointment_date,
             a.start_time, a.end_time, a.total_amount, a.notes, a.status, a.started_at,
             a.completed_at, a.cancelled_at, a.cancellation_reason, a.created_at, a.updated_at,
-            CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
-            c.phone AS customer_phone, c.email AS customer_email,
+            COALESCE(CONCAT(c.first_name, ' ', c.last_name), a.manual_customer_name) AS customer_name,
+            COALESCE(c.phone, a.manual_customer_phone) AS customer_phone, c.email AS customer_email,
             CASE WHEN e.id IS NULL THEN NULL ELSE CONCAT(e.first_name, ' ', e.last_name) END AS employee_name,
             s.name AS service_name, s.duration_minutes AS service_duration_minutes
         FROM appointments a
-        INNER JOIN customers c ON c.id = a.customer_id
+        LEFT JOIN customers c ON c.id = a.customer_id
         LEFT JOIN employees e ON e.id = a.employee_id
         INNER JOIN services s ON s.id = a.service_id${where}
         ORDER BY a.appointment_date DESC, a.start_time DESC`,
@@ -444,7 +449,9 @@ export const lockOwnedAppointment = async (connection: PoolConnection, id: numbe
 export const insert = async (
   connection: PoolConnection,
   values: {
-    customerId: number;
+    customerId: number | null;
+    customerName: string | null;
+    customerPhone: string | null;
     employeeId: number | null;
     serviceId: number;
     date: string;
@@ -456,10 +463,12 @@ export const insert = async (
 ): Promise<number> => {
   const [result] = await connection.execute<ResultSetHeader>(
     `INSERT INTO appointments 
-        (customer_id, employee_id, service_id, appointment_date, start_time, end_time, total_amount, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (customer_id, manual_customer_name, manual_customer_phone, employee_id, service_id, appointment_date, start_time, end_time, total_amount, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       values.customerId,
+      values.customerName,
+      values.customerPhone,
       values.employeeId,
       values.serviceId,
       values.date,
@@ -602,6 +611,7 @@ export const findOverdueScheduled = async (): Promise<AppointmentRow[]> => {
   const [rows] = await pool.execute<AppointmentRow[]>(
     `SELECT ${customerDetailFields}
        FROM appointments a
+       LEFT JOIN customers c ON c.id = a.customer_id
        LEFT JOIN employees e ON e.id = a.employee_id
        INNER JOIN services s ON s.id = a.service_id
        INNER JOIN settings settings_row ON settings_row.id = 1
@@ -617,6 +627,7 @@ export const findDueReminders = async (): Promise<AppointmentRow[]> => {
     `SELECT ${customerDetailFields}, e.email AS employee_email,
             settings_row.email AS admin_email
        FROM appointments a
+       LEFT JOIN customers c ON c.id = a.customer_id
        LEFT JOIN employees e ON e.id = a.employee_id
        INNER JOIN services s ON s.id = a.service_id
        INNER JOIN settings settings_row ON settings_row.id = 1
@@ -637,6 +648,7 @@ export const findDueInProgress = async (): Promise<AppointmentRow[]> => {
   const [rows] = await pool.execute<AppointmentRow[]>(
     `SELECT ${customerDetailFields}
        FROM appointments a
+       LEFT JOIN customers c ON c.id = a.customer_id
        LEFT JOIN employees e ON e.id = a.employee_id
        INNER JOIN services s ON s.id = a.service_id
       WHERE a.status = 'In Progress'

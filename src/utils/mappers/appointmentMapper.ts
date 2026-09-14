@@ -26,6 +26,7 @@ export const formatAppointment = (appointment: AppointmentRow) => ({
     customerName: appointment.customer_name,
     customerPhone: appointment.customer_phone,
     customerEmail: appointment.customer_email,
+    isAdminCreated: appointment.customer_id === null,
     employeeName: appointment.employee_name,
     serviceName: appointment.service_name,
     serviceDurationMinutes: appointment.service_duration_minutes,

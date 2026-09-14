@@ -8,6 +8,11 @@ export interface AppointmentRequest {
     notes: string | null;
 }
 
+export interface AdminAppointmentRequest extends AppointmentRequest {
+    customerName: string;
+    customerPhone: string | null;
+}
+
 export interface AppointmentFilters {
     date?: string;
     employeeId?: number;

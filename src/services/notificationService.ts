@@ -27,6 +27,7 @@ export const deliverNotification = async (
 };
 
 export const createAppointmentConfirmation = async (appointment: AppointmentRow): Promise<void> => {
+    if (appointment.customer_id === null) return;
     const serviceSummary = appointment.services?.length
         ? ` Services: ${appointment.services.map((service) => service.serviceName).join(", ")}.`
         : "";
@@ -43,6 +44,7 @@ const createAppointmentStatusNotification = async (
     title: string,
     message: string,
 ): Promise<void> => {
+    if (appointment.customer_id === null) return;
     const notification = await repository.create({
         appointmentId: appointment.id,
         customerId: appointment.customer_id,
@@ -69,6 +71,7 @@ export const createAppointmentStarted = (appointment: AppointmentRow): Promise<v
     );
 
 export const createAppointmentReminder = async (appointment: AppointmentRow): Promise<void> => {
+    if (appointment.customer_id === null) return;
     const message = `Reminder: appointment #${appointment.id} is scheduled for ${appointment.appointment_date} 
     from ${appointment.start_time} to ${appointment.end_time}.`;
     const notification = await repository.create({
