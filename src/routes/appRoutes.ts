@@ -17,6 +17,7 @@ import notificationRoutes from "./notificationRoutes.js";
 import settingsRoutes from "./settingsRoutes.js";
 import themeSettingsRoutes from "./themeSettingsRoutes.js";
 import supportRoutes from "./supportRoutes.js";
+import aiConsultationRoutes from "./aiConsultationRoutes.js";
 
 const router = Router();
 
@@ -45,5 +46,6 @@ router.use("/notifications", notificationRoutes);
 router.use("/settings", settingsRoutes);
 router.use("/theme-settings", themeSettingsRoutes);
 router.use("/support", supportRoutes);
+router.use("/ai-consultation", aiConsultationRoutes);
 
 export default router;
