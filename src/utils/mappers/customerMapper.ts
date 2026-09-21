@@ -6,6 +6,7 @@ export const formatCustomer = (customer: CustomerRow) => ({
     firstName: customer.first_name,
     lastName: customer.last_name,
     phone: customer.phone,
+    whatsappOptIn: Boolean(customer.whatsapp_opt_in),
     email: customer.email,
     profileImage: customer.profile_image,
     isActive: Boolean(customer.is_active),

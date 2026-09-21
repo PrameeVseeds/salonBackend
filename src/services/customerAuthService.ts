@@ -109,6 +109,11 @@ export const updateCustomerProfileById = async (customerId: number,input: Update
     return updated ? customerRepository.findCustomerProfileById(customerId) : null;
 };
 
+export const updateCustomerWhatsAppPreferenceById = async (customerId: number, whatsappOptIn: boolean): Promise<CustomerRow | null> => {
+    const updated = await customerRepository.updateCustomerWhatsAppPreference(customerId, whatsappOptIn);
+    return updated ? customerRepository.findCustomerProfileById(customerId) : null;
+};
+
 // Changes a customer password after checking the current password.
 export const changeCustomerPassword = async (customerId: number,currentPassword: string,newPassword: string,): Promise<boolean> => {
     const customer = await customerRepository.findCustomerById(customerId);

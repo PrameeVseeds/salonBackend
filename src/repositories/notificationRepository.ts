@@ -79,6 +79,14 @@ export const getCustomerEmail = async (customerId: number): Promise<string | nul
     return typeof rows[0]?.email === "string" ? rows[0].email : null;
 };
 
+export const getCustomerPhone = async (customerId: number): Promise<string | null> => {
+    const [rows] = await pool.execute<import("mysql2").RowDataPacket[]>(
+        `SELECT phone
+        FROM customers
+        WHERE id = ? LIMIT 1`, [customerId]);
+    return typeof rows[0]?.phone === "string" ? rows[0].phone : null;
+};
+
 export const updateDeliveryStatus = async (id: number, status: NotificationStatus): Promise<void> => {
     await pool.execute(
         `UPDATE notifications 

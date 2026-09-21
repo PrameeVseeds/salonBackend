@@ -39,6 +39,9 @@ export const validateSettings = (body: Record<string, unknown>,): ValidationResu
     body.appointmentReminderMinutes ?? body.appointment_reminder_minutes,
     false,
   );
+  const enableWhatsAppAppointmentReminders = getBoolean(
+    body.enableWhatsAppAppointmentReminders ?? body.enable_whatsapp_appointment_reminders,
+  );
   if (!salonName || !phone || !email || !address)
     return {
       isValid: false,
@@ -69,6 +72,8 @@ export const validateSettings = (body: Record<string, unknown>,): ValidationResu
       isValid: false,
       message: "Appointment reminder time must be a non-negative whole number.",
     };
+  if (enableWhatsAppAppointmentReminders === null)
+    return { isValid: false, message: "WhatsApp reminder setting must be true or false." };
   return {
     isValid: true,
     data: {
@@ -86,6 +91,7 @@ export const validateSettings = (body: Record<string, unknown>,): ValidationResu
       appointment_buffer_minutes: appointmentBufferMinutes,
       appointment_grace_period_minutes: appointmentGracePeriodMinutes,
       appointment_reminder_minutes: appointmentReminderMinutes,
+      enable_whatsapp_appointment_reminders: enableWhatsAppAppointmentReminders,
     },
   };
 };

@@ -17,6 +17,7 @@ export const formatSettings = (settings: SettingsRow) => ({
   appointmentBufferMinutes: settings.appointment_buffer_minutes,
   appointmentGracePeriodMinutes: settings.appointment_grace_period_minutes,
   appointmentReminderMinutes: settings.appointment_reminder_minutes,
+  enableWhatsAppAppointmentReminders: Boolean(settings.enable_whatsapp_appointment_reminders),
   createdAt: settings.created_at,
   updatedAt: settings.updated_at,
 });

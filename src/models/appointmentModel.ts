@@ -17,6 +17,7 @@ export interface AppointmentRow extends RowDataPacket {
     cancellation_reason: string | null;
     customer_name?: string;
     customer_phone?: string;
+    customer_whatsapp_opt_in?: boolean;
     customer_email?: string;
     employee_name?: string | null;
     service_name?: string;
@@ -24,6 +25,8 @@ export interface AppointmentRow extends RowDataPacket {
     can_start?: number | boolean;
     employee_email?: string | null;
     admin_email?: string;
+    salon_name?: string;
+    enable_whatsapp_appointment_reminders?: boolean;
     services?: Array<{
       serviceId: number;
       subServiceId?: number | null;

@@ -11,9 +11,11 @@ const customerDetailFields = `a.id, a.customer_id, a.manual_customer_name, a.man
   a.start_time, a.end_time, a.total_amount, a.notes, a.status, a.started_at, a.completed_at,
   a.cancelled_at, a.cancellation_reason, a.created_at, a.updated_at,
   COALESCE(CONCAT(c.first_name, ' ', c.last_name), a.manual_customer_name) AS customer_name,
-  COALESCE(c.phone, a.manual_customer_phone) AS customer_phone, c.email AS customer_email,
+  COALESCE(c.phone, a.manual_customer_phone) AS customer_phone, c.whatsapp_opt_in AS customer_whatsapp_opt_in, c.email AS customer_email,
   CASE WHEN e.id IS NULL THEN NULL ELSE CONCAT(e.first_name, ' ', e.last_name) END AS employee_name,
-  s.name AS service_name, s.duration_minutes AS service_duration_minutes`;
+  s.name AS service_name, s.duration_minutes AS service_duration_minutes,
+  (SELECT enable_whatsapp_appointment_reminders FROM settings WHERE id = 1)
+    AS enable_whatsapp_appointment_reminders`;
 
 export const findActiveService = async (
   serviceId: number,
@@ -625,7 +627,7 @@ export const findOverdueScheduled = async (): Promise<AppointmentRow[]> => {
 export const findDueReminders = async (): Promise<AppointmentRow[]> => {
   const [rows] = await pool.execute<AppointmentRow[]>(
     `SELECT ${customerDetailFields}, e.email AS employee_email,
-            settings_row.email AS admin_email
+            settings_row.email AS admin_email, settings_row.salon_name
        FROM appointments a
        LEFT JOIN customers c ON c.id = a.customer_id
        LEFT JOIN employees e ON e.id = a.employee_id

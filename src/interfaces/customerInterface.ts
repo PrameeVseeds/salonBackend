@@ -32,3 +32,7 @@ export interface CustomerPasswordResetResult {
     customerFirstName: string;
     expiresInMinutes: number;
 }
+
+export interface UpdateWhatsAppPreferenceInput {
+    whatsappOptIn: boolean;
+}

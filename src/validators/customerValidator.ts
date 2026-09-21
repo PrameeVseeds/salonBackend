@@ -215,6 +215,12 @@ export const validateUpdateCustomerProfile = (body: Record<string, unknown>): Va
     };
 };
 
+export const validateWhatsAppPreference = (body: Record<string, unknown>): ValidationResult<{ whatsappOptIn: boolean }> => {
+    if (typeof body.whatsappOptIn !== "boolean")
+        return { isValid: false, message: "WhatsApp preference must be true or false." };
+    return { isValid: true, data: { whatsappOptIn: body.whatsappOptIn } };
+};
+
 // Validates customer password change input.
 export const validateChangeCustomerPassword = (body: Record<string, unknown>): ValidationResult<ChangeCustomerPasswordInput> => {
     const currentPassword = typeof body.currentPassword === "string" && body.currentPassword.length > 0

@@ -17,6 +17,7 @@ export interface SettingsRow extends RowDataPacket {
   appointment_buffer_minutes: number;
   appointment_grace_period_minutes: number;
   appointment_reminder_minutes: number;
+  enable_whatsapp_appointment_reminders: boolean;
   created_at: Date;
   updated_at: Date;
 }

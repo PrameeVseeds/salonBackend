@@ -2,22 +2,28 @@ import type { NotificationFilters } from "../interfaces/notificationInterface.js
 import type { AppointmentRow } from "../models/appointmentModel.js";
 import type { NotificationRow } from "../models/notificationModel.js";
 import * as repository from "../repositories/notificationRepository.js";
+import * as reminderLogRepository from "../repositories/appointmentReminderLogRepository.js";
 import { sendEmail } from "./emailService.js";
+import { buildAppointmentWhatsAppReminder, shouldSendWhatsAppAppointmentReminder } from "./appointmentReminderMessageService.js";
+import { sendWhatsAppMessage } from "./whatsappService.js";
 
 export const deliverNotification = async (
     notification: NotificationRow,
     emailContent?: { text?: string; html?: string },
 ): Promise<NotificationRow> => {
     try {
-        if (notification.notification_type !== "Email")
-            throw new Error(`${notification.notification_type} provider is not configured.`);
-
-        const email = await repository.getCustomerEmail(notification.customer_id);
-
-        if (!email)
-            throw new Error("Customer email not found.");
-
-        await sendEmail(email, notification.title, emailContent?.text ?? notification.message, emailContent?.html);
+        if (notification.notification_type === "Email") {
+            const email = await repository.getCustomerEmail(notification.customer_id);
+            if (!email) throw new Error("Customer email not found.");
+            await sendEmail(email, notification.title, emailContent?.text ?? notification.message, emailContent?.html);
+        } else if (notification.notification_type === "WhatsApp") {
+            const phone = await repository.getCustomerPhone(notification.customer_id);
+            if (!phone) throw new Error("Customer phone number not found.");
+            const result = await sendWhatsAppMessage(phone, notification.message);
+            if (!result.success) throw new Error(result.message ?? "WhatsApp provider request failed.");
+        } else {
+            throw new Error("SMS provider is not configured.");
+        }
         await repository.updateDeliveryStatus(notification.id, "Sent");
 
     } catch {
@@ -37,6 +43,7 @@ export const createAppointmentConfirmation = async (appointment: AppointmentRow)
         message: `Your appointment is confirmed for ${appointment.appointment_date} from ${appointment.start_time} to ${appointment.end_time}.${serviceSummary}`,
     });
     if (notification) await deliverNotification(notification);
+    await createAppointmentWhatsAppNotification(appointment, "Appointment Confirmation", notification?.message);
 };
 
 const createAppointmentStatusNotification = async (
@@ -49,6 +56,23 @@ const createAppointmentStatusNotification = async (
         appointmentId: appointment.id,
         customerId: appointment.customer_id,
         type: "Email",
+        title,
+        message,
+    });
+    if (notification) await deliverNotification(notification);
+    await createAppointmentWhatsAppNotification(appointment, title, message);
+};
+
+const createAppointmentWhatsAppNotification = async (
+    appointment: AppointmentRow,
+    title: string,
+    message: string | undefined,
+): Promise<void> => {
+    if (!message || appointment.customer_id === null || !shouldSendWhatsAppAppointmentReminder(appointment)) return;
+    const notification = await repository.create({
+        appointmentId: appointment.id,
+        customerId: appointment.customer_id,
+        type: "WhatsApp",
         title,
         message,
     });
@@ -107,6 +131,30 @@ export const createAppointmentReminder = async (appointment: AppointmentRow): Pr
     await Promise.allSettled(
         staffRecipients.map((email) => sendEmail(email, "Appointment Reminder", message)),
     );
+    await createWhatsAppAppointmentReminder(appointment);
+};
+
+const createWhatsAppAppointmentReminder = async (appointment: AppointmentRow): Promise<void> => {
+    if (!shouldSendWhatsAppAppointmentReminder(appointment)) return;
+    if (!appointment.customer_phone) return;
+
+    const claimed = await reminderLogRepository.createPending(
+        appointment.id, "whatsapp", new Date(),
+    );
+    if (!claimed) return;
+
+    const result = await sendWhatsAppMessage(
+        appointment.customer_phone,
+        buildAppointmentWhatsAppReminder(appointment, appointment.salon_name ?? "the salon"),
+    );
+    if (result.success) {
+        await reminderLogRepository.markSent(appointment.id, "whatsapp", result.providerMessageId);
+        return;
+    }
+    await reminderLogRepository.markFailed(
+        appointment.id, "whatsapp", result.message ?? "WhatsApp provider request failed.",
+    );
+    console.error(`WhatsApp reminder failed for appointment ${appointment.id}:`, result.message);
 };
 
 export const createAppointmentCompletion = (appointment: AppointmentRow): Promise<void> =>

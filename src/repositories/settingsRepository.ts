@@ -4,11 +4,11 @@ import { pool } from "../config/db.js";
 
 const settingsSelectFields = `id, salon_name, phone, email, address, map_url, logo_url, facebook_url, 
 instagram_url, whatsapp_number, allow_customer_choose_employee, enable_online_payment, 
-booking_interval_minutes, appointment_buffer_minutes, appointment_grace_period_minutes, appointment_reminder_minutes, created_at, updated_at`;
+booking_interval_minutes, appointment_buffer_minutes, appointment_grace_period_minutes, appointment_reminder_minutes, enable_whatsapp_appointment_reminders, created_at, updated_at`;
 
 const insertSettingsFields = `id, salon_name, phone, email, address, map_url, facebook_url, instagram_url, whatsapp_number, 
 allow_customer_choose_employee, enable_online_payment, booking_interval_minutes, appointment_buffer_minutes,
-appointment_grace_period_minutes, appointment_reminder_minutes`;
+appointment_grace_period_minutes, appointment_reminder_minutes, enable_whatsapp_appointment_reminders`;
 
 export const getSettings = async (): Promise<SettingsRow | null> => {
   const [rows] = await pool.execute<SettingsRow[]>(
@@ -23,7 +23,7 @@ export const getSettings = async (): Promise<SettingsRow | null> => {
 export const updateSettings = async (input: SettingsInput,): Promise<SettingsRow | null> => {
   await pool.execute(
     `INSERT INTO settings (${insertSettingsFields})
-        VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON DUPLICATE KEY 
         UPDATE salon_name=VALUES(salon_name), 
         phone=VALUES(phone), email=VALUES(email), 
@@ -34,7 +34,8 @@ export const updateSettings = async (input: SettingsInput,): Promise<SettingsRow
         booking_interval_minutes=VALUES(booking_interval_minutes), 
         appointment_buffer_minutes=VALUES(appointment_buffer_minutes),
         appointment_grace_period_minutes=VALUES(appointment_grace_period_minutes),
-        appointment_reminder_minutes=VALUES(appointment_reminder_minutes)`,
+        appointment_reminder_minutes=VALUES(appointment_reminder_minutes),
+        enable_whatsapp_appointment_reminders=VALUES(enable_whatsapp_appointment_reminders)`,
     [
       input.salon_name,
       input.phone,
@@ -50,6 +51,7 @@ export const updateSettings = async (input: SettingsInput,): Promise<SettingsRow
       input.appointment_buffer_minutes,
       input.appointment_grace_period_minutes,
       input.appointment_reminder_minutes,
+      input.enable_whatsapp_appointment_reminders,
     ],
   );
   return getSettings();

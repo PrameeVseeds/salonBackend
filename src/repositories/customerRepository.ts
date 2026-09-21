@@ -8,6 +8,7 @@ const customerSelectFields =
     first_name,
     last_name,
     phone,
+    whatsapp_opt_in,
     email,
     password_hash,
     profile_image,
@@ -20,6 +21,7 @@ const customerPublicSelectFields =
     first_name,
     last_name,
     phone,
+    whatsapp_opt_in,
     email,
     profile_image,
     is_active,
@@ -53,9 +55,9 @@ export const findCustomerByPhone = async (phone: string): Promise<CustomerRow | 
 export const createCustomer = async (input: RegisterCustomerInput,passwordHash: string,): Promise<CustomerRow | null> => {
     const [result] = await pool.execute<ResultSetHeader>(
         `INSERT INTO customers
-             (first_name, last_name, phone, email, password_hash, is_active)
+             (first_name, last_name, phone, whatsapp_opt_in, email, password_hash, is_active)
          VALUES
-             (?, ?, ?, ?, ?, TRUE)`,
+             (?, ?, ?, TRUE, ?, ?, TRUE)`,
         [
             input.firstName.trim(),
             input.lastName.trim(),
@@ -146,6 +148,14 @@ export const updateCustomerProfile = async (customerId: number,input: UpdateCust
         ],
     );
 
+    return result.affectedRows > 0;
+};
+
+export const updateCustomerWhatsAppPreference = async (customerId: number, whatsappOptIn: boolean): Promise<boolean> => {
+    const [result] = await pool.execute<ResultSetHeader>(
+        `UPDATE customers SET whatsapp_opt_in = ? WHERE id = ?`,
+        [whatsappOptIn, customerId],
+    );
     return result.affectedRows > 0;
 };
 

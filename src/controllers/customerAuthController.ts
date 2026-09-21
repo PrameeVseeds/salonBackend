@@ -14,6 +14,7 @@ import {
     resetCustomerPassword,
     updateCustomerProfileById,
     updateCustomerProfileImageById,
+    updateCustomerWhatsAppPreferenceById,
 } from "../services/customerAuthService.js";
 import {
     validateChangeCustomerPassword,
@@ -22,6 +23,7 @@ import {
     validateRegisterCustomer,
     validateResetCustomerPassword,
     validateUpdateCustomerProfile,
+    validateWhatsAppPreference,
 } from "../validators/customerValidator.js";
 
 const getAuthenticatedCustomerId = (req: CustomerAuthRequest): number | null => {
@@ -215,6 +217,29 @@ export const updateCustomerProfile = async (req: CustomerAuthRequest, res: Respo
             success: false,
             message,
         });
+    }
+};
+
+export const updateWhatsAppPreference = async (req: CustomerAuthRequest, res: Response): Promise<void> => {
+    try {
+        const customerId = getAuthenticatedCustomerId(req);
+        const validation = validateWhatsAppPreference(req.body);
+        if (!customerId) {
+            res.status(401).json({ success: false, message: "Customer is not authenticated." });
+            return;
+        }
+        if (!validation.isValid) {
+            sendBadRequest(res, validation.message);
+            return;
+        }
+        const customer = await updateCustomerWhatsAppPreferenceById(customerId, validation.data.whatsappOptIn);
+        if (!customer) {
+            res.status(404).json({ success: false, message: "Customer account not found." });
+            return;
+        }
+        res.status(200).json({ success: true, message: "WhatsApp reminder preference updated.", data: { customer: formatCustomer(customer) } });
+    } catch {
+        res.status(500).json({ success: false, message: "Failed to update WhatsApp reminder preference." });
     }
 };
 

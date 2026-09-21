@@ -5,6 +5,7 @@ export interface CustomerRow extends RowDataPacket {
     first_name: string;
     last_name: string;
     phone: string;
+    whatsapp_opt_in: boolean;
     email: string;
     password_hash: string;
     profile_image: string | null;
