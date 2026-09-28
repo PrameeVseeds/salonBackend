@@ -1,4 +1,5 @@
 import type { AppointmentRow } from "../models/appointmentModel.js";
+import { formatAppointmentDate, formatAppointmentTime } from "../utils/appointmentDateTime.js";
 
 export const shouldSendWhatsAppAppointmentReminder = (appointment: Pick<AppointmentRow,
   "customer_whatsapp_opt_in" | "customer_phone" | "enable_whatsapp_appointment_reminders">,
@@ -13,6 +14,12 @@ const uniqueServiceNames = (appointment: AppointmentRow): string => {
   return [...new Set(names.filter((name): name is string => Boolean(name)))].join(", ");
 };
 
+const professionalSummary = (appointment: AppointmentRow): string => appointment.services?.length
+  ? appointment.services.map((service) =>
+    `${service.serviceName}: ${service.employeeName ?? "To be confirmed"}`,
+  ).join("\n")
+  : appointment.employee_name ?? "To be confirmed";
+
 export const buildAppointmentWhatsAppReminder = (
   appointment: AppointmentRow,
   salonName: string,
@@ -20,9 +27,9 @@ export const buildAppointmentWhatsAppReminder = (
 
 This is a reminder from ${salonName} for your upcoming appointment.
 
-Date: ${String(appointment.appointment_date).slice(0, 10)}
-Time: ${String(appointment.start_time).slice(0, 5)}
-Professional: ${appointment.employee_name ?? "To be confirmed"}
+Date: ${formatAppointmentDate(appointment.appointment_date)}
+Time: ${formatAppointmentTime(appointment.start_time)}
+Professional: ${professionalSummary(appointment)}
 Service: ${uniqueServiceNames(appointment) || "Appointment service"}
 
 We look forward to seeing you.`;

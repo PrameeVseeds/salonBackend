@@ -6,6 +6,7 @@ import * as reminderLogRepository from "../repositories/appointmentReminderLogRe
 import { sendEmail } from "./emailService.js";
 import { buildAppointmentWhatsAppReminder, shouldSendWhatsAppAppointmentReminder } from "./appointmentReminderMessageService.js";
 import { sendWhatsAppMessage } from "./whatsappService.js";
+import { formatAppointmentDate, formatAppointmentTime } from "../utils/appointmentDateTime.js";
 
 export const deliverNotification = async (
     notification: NotificationRow,
@@ -35,12 +36,14 @@ export const deliverNotification = async (
 export const createAppointmentConfirmation = async (appointment: AppointmentRow): Promise<void> => {
     if (appointment.customer_id === null) return;
     const serviceSummary = appointment.services?.length
-        ? ` Services: ${appointment.services.map((service) => service.serviceName).join(", ")}.`
-        : "";
+        ? `\n\nServices and professionals:\n${appointment.services.map((service) =>
+            `- ${service.serviceName}: ${service.employeeName ?? "To be confirmed"}`,
+        ).join("\n")}`
+        : `\n\nProfessional: ${appointment.employee_name ?? "To be confirmed"}`;
     const notification = await repository.create({
         appointmentId: appointment.id, customerId: appointment.customer_id, type: "Email",
         title: "Appointment Confirmation",
-        message: `Your appointment is confirmed for ${appointment.appointment_date} from ${appointment.start_time} to ${appointment.end_time}.${serviceSummary}`,
+        message: `Your appointment is confirmed for ${formatAppointmentDate(appointment.appointment_date)} from ${formatAppointmentTime(appointment.start_time)} to ${formatAppointmentTime(appointment.end_time)}.${serviceSummary}`,
     });
     if (notification) await deliverNotification(notification);
     await createAppointmentWhatsAppNotification(appointment, "Appointment Confirmation", notification?.message);
@@ -83,7 +86,7 @@ export const createAppointmentCancellation = (appointment: AppointmentRow): Prom
     createAppointmentStatusNotification(
         appointment,
         "Appointment Cancelled",
-        `Your appointment for ${appointment.appointment_date} at ${appointment.start_time} 
+        `Your appointment for ${formatAppointmentDate(appointment.appointment_date)} at ${formatAppointmentTime(appointment.start_time)} 
         was automatically cancelled because it was not started within the allowed grace period.`,
     );
 
@@ -91,13 +94,12 @@ export const createAppointmentStarted = (appointment: AppointmentRow): Promise<v
     createAppointmentStatusNotification(
         appointment,
         "Appointment Started",
-        `Your appointment for ${appointment.appointment_date} at ${appointment.start_time} has started.`,
+        `Your appointment for ${formatAppointmentDate(appointment.appointment_date)} at ${formatAppointmentTime(appointment.start_time)} has started.`,
     );
 
 export const createAppointmentReminder = async (appointment: AppointmentRow): Promise<void> => {
     if (appointment.customer_id === null) return;
-    const message = `Reminder: appointment #${appointment.id} is scheduled for ${appointment.appointment_date} 
-    from ${appointment.start_time} to ${appointment.end_time}.`;
+    const message = `Reminder: appointment #${appointment.id} is scheduled for ${formatAppointmentDate(appointment.appointment_date)} from ${formatAppointmentTime(appointment.start_time)} to ${formatAppointmentTime(appointment.end_time)}.`;
     const notification = await repository.create({
         appointmentId: appointment.id,
         customerId: appointment.customer_id,
@@ -161,7 +163,7 @@ export const createAppointmentCompletion = (appointment: AppointmentRow): Promis
     createAppointmentStatusNotification(
         appointment,
         "Appointment Completed",
-        `Your appointment for ${appointment.appointment_date} at ${appointment.start_time} has been completed. Thank you for visiting us.`,
+        `Your appointment for ${formatAppointmentDate(appointment.appointment_date)} at ${formatAppointmentTime(appointment.start_time)} has been completed. Thank you for visiting us.`,
     );
 
 export const getNotifications = (filters: NotificationFilters) => repository.findAll(filters);
