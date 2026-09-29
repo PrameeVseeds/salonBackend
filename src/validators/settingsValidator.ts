@@ -42,6 +42,15 @@ export const validateSettings = (body: Record<string, unknown>,): ValidationResu
   const enableWhatsAppAppointmentReminders = getBoolean(
     body.enableWhatsAppAppointmentReminders ?? body.enable_whatsapp_appointment_reminders,
   );
+  const restrictCustomerBookingHours = getBoolean(
+    body.restrictCustomerBookingHours ?? body.restrict_customer_booking_hours,
+  );
+  const restrictedStartTime = getString(
+    body.customerBookingRestrictedStartTime ?? body.customer_booking_restricted_start_time,
+  );
+  const restrictedEndTime = getString(
+    body.customerBookingRestrictedEndTime ?? body.customer_booking_restricted_end_time,
+  );
   if (!salonName || !phone || !email || !address)
     return {
       isValid: false,
@@ -74,6 +83,18 @@ export const validateSettings = (body: Record<string, unknown>,): ValidationResu
     };
   if (enableWhatsAppAppointmentReminders === null)
     return { isValid: false, message: "WhatsApp reminder setting must be true or false." };
+  if (restrictCustomerBookingHours === null)
+    return { isValid: false, message: "Customer booking hour restriction must be true or false." };
+  const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/;
+  if (!restrictedStartTime || !timePattern.test(restrictedStartTime) ||
+    !restrictedEndTime || !timePattern.test(restrictedEndTime))
+    return { isValid: false, message: "Restricted booking times must use HH:mm format." };
+  const timeMinutes = (time: string) => {
+    const [hours, minutes] = time.split(":").map(Number);
+    return hours * 60 + minutes;
+  };
+  if (timeMinutes(restrictedStartTime) === timeMinutes(restrictedEndTime))
+    return { isValid: false, message: "Restricted booking start and end times must be different." };
   return {
     isValid: true,
     data: {
@@ -92,6 +113,9 @@ export const validateSettings = (body: Record<string, unknown>,): ValidationResu
       appointment_grace_period_minutes: appointmentGracePeriodMinutes,
       appointment_reminder_minutes: appointmentReminderMinutes,
       enable_whatsapp_appointment_reminders: enableWhatsAppAppointmentReminders,
+      restrict_customer_booking_hours: restrictCustomerBookingHours,
+      customer_booking_restricted_start_time: restrictedStartTime.length === 5 ? restrictedStartTime + ":00" : restrictedStartTime,
+      customer_booking_restricted_end_time: restrictedEndTime.length === 5 ? restrictedEndTime + ":00" : restrictedEndTime,
     },
   };
 };

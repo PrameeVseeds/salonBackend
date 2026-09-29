@@ -51,4 +51,7 @@ export interface AppointmentScheduleContext {
 export interface AppointmentSchedulingSettings extends RowDataPacket {
   booking_interval_minutes: number;
   appointment_buffer_minutes: number;
+  restrict_customer_booking_hours: boolean;
+  customer_booking_restricted_start_time: string;
+  customer_booking_restricted_end_time: string;
 }

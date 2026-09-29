@@ -237,7 +237,8 @@ export const findSchedulingSettings = async (
 ): Promise<appointmentsServiceInterface.AppointmentSchedulingSettings> => {
   const [rows] = await db.execute<
     appointmentsServiceInterface.AppointmentSchedulingSettings[]>(
-      `SELECT booking_interval_minutes, appointment_buffer_minutes 
+      `SELECT booking_interval_minutes, appointment_buffer_minutes,
+          restrict_customer_booking_hours, customer_booking_restricted_start_time, customer_booking_restricted_end_time
         FROM settings 
         WHERE id = 1 
         LIMIT 1`,
@@ -247,6 +248,9 @@ export const findSchedulingSettings = async (
     ({
       booking_interval_minutes: 30,
       appointment_buffer_minutes: 0,
+      restrict_customer_booking_hours: true,
+      customer_booking_restricted_start_time: "00:00:00",
+      customer_booking_restricted_end_time: "07:00:00",
     } as appointmentsServiceInterface.AppointmentSchedulingSettings)
   );
 };
