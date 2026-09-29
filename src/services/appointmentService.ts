@@ -17,6 +17,16 @@ const appointmentStartTime = (date: string, time: string): number =>
 const isPastOrCurrentTime = (date: string, time: string): boolean =>
   appointmentStartTime(date, time) <= Date.now();
 
+const isRestrictedCustomerBookingTime = (
+  start: number,
+  scheduling: appointmentInterface.AppointmentSchedulingSettings,
+): boolean => {
+  if (!Boolean(scheduling.restrict_customer_booking_hours)) return false;
+  const from = toMinutes(scheduling.customer_booking_restricted_start_time);
+  const until = toMinutes(scheduling.customer_booking_restricted_end_time);
+  return from < until ? start >= from && start < until : start >= from || start < until;
+};
+
 const toDateKey = (value: unknown): string => {
   if (!(value instanceof Date))
     return String(value).slice(0, 10);
@@ -211,7 +221,7 @@ export const getAvailability = async (
     const slots: string[] = [];
     const slotDetails: Record<string, { serviceLimit: number; bookedCount: number; availableEmployees: number; remainingCapacity: number; limitingReason: "service_capacity" | "employee_availability" | "both" | null }> = {};
     for (let start = opening; start + slotStep <= closing; start += slotStep) {
-      if (isPastOrCurrentTime(query.date, toTime(start)))
+      if (isPastOrCurrentTime(query.date, toTime(start)) || isRestrictedCustomerBookingTime(start, scheduling))
         continue;
 
       if (await planServiceSegments(query, start)) {
@@ -255,7 +265,7 @@ export const getAvailability = async (
     start + duration + buffer <= closing;
     start += slotStep
   ) {
-    if (isPastOrCurrentTime(query.date, toTime(start))) continue;
+    if (isPastOrCurrentTime(query.date, toTime(start)) || isRestrictedCustomerBookingTime(start, scheduling)) continue;
     const serviceBookings = context.serviceAppointments.filter((range) =>
       overlaps(start, start + duration + buffer, range),
     ).length;
@@ -320,6 +330,12 @@ const saveAppointment = async (customerId: number | null, input: AppointmentRequ
     const candidates: Array<number | null> = input.employeeId ? [input.employeeId] : [null];
     const scheduling = await repository.findSchedulingSettings(connection);
     const start = toMinutes(input.startTime);
+    if (customerId !== null && !appointmentId && isRestrictedCustomerBookingTime(start, scheduling))
+      throw new Error(
+        "The selected booking time is unavailable to customers between " +
+        scheduling.customer_booking_restricted_start_time.slice(0, 5) + " and " +
+        scheduling.customer_booking_restricted_end_time.slice(0, 5) + ".",
+      );
     if (input.serviceIds.length > 1 || input.subServiceIds.some(Boolean)) {
       for (const serviceId of input.serviceIds.slice(1))
         if (!(await repository.lockService(connection, serviceId))) throw new Error("Service not found or inactive.");

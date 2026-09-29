@@ -35,15 +35,22 @@ export const deliverNotification = async (
 
 export const createAppointmentConfirmation = async (appointment: AppointmentRow): Promise<void> => {
     if (appointment.customer_id === null) return;
-    const serviceSummary = appointment.services?.length
-        ? `\n\nServices and professionals:\n${appointment.services.map((service) =>
-            `- ${service.serviceName}: ${service.employeeName ?? "To be confirmed"}`,
-        ).join("\n")}`
-        : `\n\nProfessional: ${appointment.employee_name ?? "To be confirmed"}`;
+    const customerName = appointment.customer_name ?? "Customer";
+    const salonName = appointment.salon_name ?? "A Line Salon";
+    const date = formatAppointmentDate(appointment.appointment_date);
+    const time = formatAppointmentTime(appointment.start_time);
     const notification = await repository.create({
         appointmentId: appointment.id, customerId: appointment.customer_id, type: "Email",
         title: "Appointment Confirmation",
-        message: `Your appointment is confirmed for ${formatAppointmentDate(appointment.appointment_date)} from ${formatAppointmentTime(appointment.start_time)} to ${formatAppointmentTime(appointment.end_time)}.${serviceSummary}`,
+        message: [
+            "Hi " + customerName + "!",
+            "Your appointment at " + salonName + " has been confirmed for " + date + " at " + time + ".",
+            "Thank you for booking with us!",
+            "",
+            "ආයුබෝවන් " + customerName + "!",
+            salonName + " වෙත ඔබ යොමුකළ ඒපොයින්ට්මන්ට් එක " + date + " දින " + time + " වේලාවට තහවුරු කරන ලදී.",
+            "ස්තූතියි!",
+        ].join("\n"),
     });
     if (notification) await deliverNotification(notification);
     await createAppointmentWhatsAppNotification(appointment, "Appointment Confirmation", notification?.message);
@@ -86,8 +93,15 @@ export const createAppointmentCancellation = (appointment: AppointmentRow): Prom
     createAppointmentStatusNotification(
         appointment,
         "Appointment Cancelled",
-        `Your appointment for ${formatAppointmentDate(appointment.appointment_date)} at ${formatAppointmentTime(appointment.start_time)} 
-        was automatically cancelled because it was not started within the allowed grace period.`,
+        [
+            "Hi " + (appointment.customer_name ?? "Customer") + "!",
+            "As the scheduled time (" + formatAppointmentTime(appointment.start_time) + ") has passed, your appointment at " + (appointment.salon_name ?? "A Line Salon") + " has been automatically cancelled.",
+            "Please visit our website to rebook.",
+            "",
+            "ආයුබෝවන් " + (appointment.customer_name ?? "Customer") + "!",
+            "නියමිත වේලාව (" + formatAppointmentTime(appointment.start_time) + ") පසුවී ඇති බැවින් " + (appointment.salon_name ?? "A Line Salon") + " හි ඔබගේ ඒපොයින්ට්මන්ට් එක අවලංගු (Cancel) වී ඇත.",
+            "නැවත ඒපොයින්ට්මන්ට් එකක් වෙන්කර ගැනීමට කරුණාකර අපගේ වෙබ්සයිට් එක වෙත පිවිසෙන්න.",
+        ].join("\n"),
     );
 
 export const createAppointmentStarted = (appointment: AppointmentRow): Promise<void> =>
@@ -99,7 +113,16 @@ export const createAppointmentStarted = (appointment: AppointmentRow): Promise<v
 
 export const createAppointmentReminder = async (appointment: AppointmentRow): Promise<void> => {
     if (appointment.customer_id === null) return;
-    const message = `Reminder: appointment #${appointment.id} is scheduled for ${formatAppointmentDate(appointment.appointment_date)} from ${formatAppointmentTime(appointment.start_time)} to ${formatAppointmentTime(appointment.end_time)}.`;
+    const customerName = appointment.customer_name ?? "Customer";
+    const salonName = appointment.salon_name ?? "A Line Salon";
+    const time = formatAppointmentTime(appointment.start_time);
+    const message = [
+        "Hi " + customerName + "!",
+        "Friendly reminder that your appointment at " + salonName + " is in 15 minutes at " + time + ". We are waiting for you!",
+        "",
+        "ආයුබෝවන් " + customerName + "!",
+        salonName + " හි ඔබගේ ඒපොයින්ට්මන්ට් එක තව විනාඩි 15කින් (" + time + "ට) යෙදී ඇත. කරුණාකර වේලාවට පැමිණෙන්න.",
+    ].join("\n");
     const notification = await repository.create({
         appointmentId: appointment.id,
         customerId: appointment.customer_id,
@@ -111,13 +134,13 @@ export const createAppointmentReminder = async (appointment: AppointmentRow): Pr
         return;
 
     const frontendUrl = process.env.FRONTEND_URL?.replace(/\/+$/, "");
-    const cancellationUrl = frontendUrl ? `${frontendUrl}/appointments?cancel=${appointment.id}` : null;
+    const cancellationUrl = frontendUrl ? frontendUrl + "/appointments?cancel=" + appointment.id : null;
     await deliverNotification(notification, cancellationUrl ? {
         text: `${message}\n\nNeed to cancel? Review and confirm your cancellation here: ${cancellationUrl}`,
         html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#2b2924;max-width:560px;margin:auto">
           <div style="padding:24px;border:1px solid #e5dfd4;border-radius:14px">
             <h2 style="margin:0 0 12px">Appointment reminder</h2>
-            <p style="margin:0 0 18px">${message}</p>
+            <p style="margin:0 0 18px;white-space:pre-line">${message}</p>
             <p style="margin:0 0 10px;color:#6f675d">If you can no longer attend,
              you can review and confirm the cancellation securely in your account.</p>
             <a href="${cancellationUrl}" style="display:inline-block;padding:11px 18px;border-radius:8px;color:#fff;background:#b83249;
@@ -147,7 +170,7 @@ const createWhatsAppAppointmentReminder = async (appointment: AppointmentRow): P
 
     const result = await sendWhatsAppMessage(
         appointment.customer_phone,
-        buildAppointmentWhatsAppReminder(appointment, appointment.salon_name ?? "the salon"),
+        buildAppointmentWhatsAppReminder(appointment, appointment.salon_name ?? "A Line Salon"),
     );
     if (result.success) {
         await reminderLogRepository.markSent(appointment.id, "whatsapp", result.providerMessageId);

@@ -18,6 +18,9 @@ export const formatSettings = (settings: SettingsRow) => ({
   appointmentGracePeriodMinutes: settings.appointment_grace_period_minutes,
   appointmentReminderMinutes: settings.appointment_reminder_minutes,
   enableWhatsAppAppointmentReminders: Boolean(settings.enable_whatsapp_appointment_reminders),
+  restrictCustomerBookingHours: Boolean(settings.restrict_customer_booking_hours),
+  customerBookingRestrictedStartTime: String(settings.customer_booking_restricted_start_time).slice(0, 5),
+  customerBookingRestrictedEndTime: String(settings.customer_booking_restricted_end_time).slice(0, 5),
   createdAt: settings.created_at,
   updatedAt: settings.updated_at,
 });

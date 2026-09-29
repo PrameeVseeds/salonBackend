@@ -14,4 +14,7 @@ export interface SettingsInput {
   appointment_grace_period_minutes: number;
   appointment_reminder_minutes: number;
   enable_whatsapp_appointment_reminders: boolean;
+  restrict_customer_booking_hours: boolean;
+  customer_booking_restricted_start_time: string;
+  customer_booking_restricted_end_time: string;
 }

@@ -1,5 +1,5 @@
 import type { AppointmentRow } from "../models/appointmentModel.js";
-import { formatAppointmentDate, formatAppointmentTime } from "../utils/appointmentDateTime.js";
+import { formatAppointmentTime } from "../utils/appointmentDateTime.js";
 
 export const shouldSendWhatsAppAppointmentReminder = (appointment: Pick<AppointmentRow,
   "customer_whatsapp_opt_in" | "customer_phone" | "enable_whatsapp_appointment_reminders">,
@@ -9,27 +9,17 @@ export const shouldSendWhatsAppAppointmentReminder = (appointment: Pick<Appointm
   process.env.WHATSAPP_ENABLED?.toLowerCase() === "true",
 );
 
-const uniqueServiceNames = (appointment: AppointmentRow): string => {
-  const names = appointment.services?.map((service) => service.serviceName) ?? [appointment.service_name];
-  return [...new Set(names.filter((name): name is string => Boolean(name)))].join(", ");
-};
-
-const professionalSummary = (appointment: AppointmentRow): string => appointment.services?.length
-  ? appointment.services.map((service) =>
-    `${service.serviceName}: ${service.employeeName ?? "To be confirmed"}`,
-  ).join("\n")
-  : appointment.employee_name ?? "To be confirmed";
-
 export const buildAppointmentWhatsAppReminder = (
   appointment: AppointmentRow,
   salonName: string,
-): string => `Hi ${appointment.customer_name ?? "there"},
-
-This is a reminder from ${salonName} for your upcoming appointment.
-
-Date: ${formatAppointmentDate(appointment.appointment_date)}
-Time: ${formatAppointmentTime(appointment.start_time)}
-Professional: ${professionalSummary(appointment)}
-Service: ${uniqueServiceNames(appointment) || "Appointment service"}
-
-We look forward to seeing you.`;
+): string => {
+  const customerName = appointment.customer_name ?? "Customer";
+  const time = formatAppointmentTime(appointment.start_time);
+  return [
+    `Hi ${customerName}!`,
+    `Friendly reminder that your appointment at ${salonName} is in 15 minutes at ${time}. We are waiting for you!`,
+    "",
+    `ආයුබෝවන් ${customerName}!`,
+    `${salonName} හි ඔබගේ ඒපොයින්ට්මන්ට් එක තව විනාඩි 15කින් (${time} ට) යෙදී ඇත. කරුණාකර වේලාවට පැමිණෙන්න.`,
+  ].join("\n");
+};
