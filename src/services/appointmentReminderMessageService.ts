@@ -8,21 +8,11 @@ export const shouldSendWhatsAppAppointmentReminder = (appointment: Pick<Appointm
   process.env.WHATSAPP_ENABLED?.toLowerCase() === "true",
 );
 
-const uniqueServiceNames = (appointment: AppointmentRow): string => {
-  const names = appointment.services?.map((service) => service.serviceName) ?? [appointment.service_name];
-  return [...new Set(names.filter((name): name is string => Boolean(name)))].join(", ");
-};
-
 export const buildAppointmentWhatsAppReminder = (
   appointment: AppointmentRow,
   salonName: string,
-): string => `Hi ${appointment.customer_name ?? "there"},
-
-This is a reminder from ${salonName} for your upcoming appointment.
-
-Date: ${String(appointment.appointment_date).slice(0, 10)}
-Time: ${String(appointment.start_time).slice(0, 5)}
-Professional: ${appointment.employee_name ?? "To be confirmed"}
-Service: ${uniqueServiceNames(appointment) || "Appointment service"}
-
-We look forward to seeing you.`;
+): string => {
+  const customerName = appointment.customer_name ?? "there";
+  const time = String(appointment.start_time).slice(0, 5);
+  return `Hi ${customerName}! 👋 Just a friendly reminder that your appointment at ${salonName} is scheduled for ${time} today, which is in 15 minutes. We look forward to seeing you soon!\n\nආයුබෝවන් ${customerName}! 👋 මෙය ඔබගේ ඒපොයින්ට්මන්ට් එක පිළිබඳ සුහද මතක් කිරීමකි. ${salonName} හි ඔබගේ ඒපොයින්ට්මන්ට් එක අද ${time} ට, එනම් තවත් විනාඩි 15කින් යෙදී ඇත. ඔබව ඉක්මනින් හමුවීමට අපි බලාපොරොත්තු වෙමු!`;
+};

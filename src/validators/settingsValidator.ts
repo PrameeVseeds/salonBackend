@@ -1,5 +1,10 @@
 import type { SettingsInput } from "../interfaces/settingsInterface.js";
 import { getString, type ValidationResult } from "./validationUtils.js";
+import {
+  defaultAppointmentCancellationMessage,
+  defaultAppointmentConfirmationMessage,
+  defaultAppointmentReminderMessage,
+} from "../services/appointmentMessageTemplateService.js";
 
 const getBoolean = (value: unknown) =>
   typeof value === "boolean" ? value : null;
@@ -42,6 +47,9 @@ export const validateSettings = (body: Record<string, unknown>,): ValidationResu
   const enableWhatsAppAppointmentReminders = getBoolean(
     body.enableWhatsAppAppointmentReminders ?? body.enable_whatsapp_appointment_reminders,
   );
+  const appointmentConfirmationMessage = getString(body.appointmentConfirmationMessage ?? body.appointment_confirmation_message) ?? defaultAppointmentConfirmationMessage;
+  const appointmentReminderMessage = getString(body.appointmentReminderMessage ?? body.appointment_reminder_message) ?? defaultAppointmentReminderMessage;
+  const appointmentCancellationMessage = getString(body.appointmentCancellationMessage ?? body.appointment_cancellation_message) ?? defaultAppointmentCancellationMessage;
   if (!salonName || !phone || !email || !address)
     return {
       isValid: false,
@@ -74,6 +82,10 @@ export const validateSettings = (body: Record<string, unknown>,): ValidationResu
     };
   if (enableWhatsAppAppointmentReminders === null)
     return { isValid: false, message: "WhatsApp reminder setting must be true or false." };
+  if (appointmentConfirmationMessage.length > 5000 ||
+    appointmentReminderMessage.length > 5000 ||
+    appointmentCancellationMessage.length > 5000)
+    return { isValid: false, message: "Appointment messages are required and must be 5000 characters or fewer." };
   return {
     isValid: true,
     data: {
@@ -92,6 +104,9 @@ export const validateSettings = (body: Record<string, unknown>,): ValidationResu
       appointment_grace_period_minutes: appointmentGracePeriodMinutes,
       appointment_reminder_minutes: appointmentReminderMinutes,
       enable_whatsapp_appointment_reminders: enableWhatsAppAppointmentReminders,
+      appointment_confirmation_message: appointmentConfirmationMessage,
+      appointment_reminder_message: appointmentReminderMessage,
+      appointment_cancellation_message: appointmentCancellationMessage,
     },
   };
 };
