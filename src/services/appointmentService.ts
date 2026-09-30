@@ -503,6 +503,7 @@ export const getAvailableEmployeeIdsForAppointment = async (id: number, serviceI
   const start = toMinutes(segment?.startTime ?? appointment.start_time);
   const end = toMinutes(segment?.endTime ?? appointment.end_time);
   const employeeIds = await repository.findActiveEmployeeIdsForService(targetServiceId);
+  const assignedEmployeeId = segment?.employeeId ?? appointment.employee_id;
   const availability = await Promise.all(employeeIds.map(async (employeeId) => {
     const context = await getScheduleContext({
       date,
@@ -515,7 +516,10 @@ export const getAvailableEmployeeIdsForAppointment = async (id: number, serviceI
       ? employeeId
       : null;
   }));
-  return availability.filter((employeeId): employeeId is number => employeeId !== null);
+  const availableEmployeeIds = availability.filter((employeeId): employeeId is number => employeeId !== null);
+  if (assignedEmployeeId !== null && !availableEmployeeIds.includes(assignedEmployeeId))
+    availableEmployeeIds.push(assignedEmployeeId);
+  return availableEmployeeIds;
 };
 
 export const startAppointment = async (id: number): Promise<AppointmentRow> => {

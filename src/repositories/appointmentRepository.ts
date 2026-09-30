@@ -237,7 +237,7 @@ export const findSchedulingSettings = async (
 ): Promise<appointmentsServiceInterface.AppointmentSchedulingSettings> => {
   const [rows] = await db.execute<
     appointmentsServiceInterface.AppointmentSchedulingSettings[]>(
-      `SELECT booking_interval_minutes, appointment_buffer_minutes 
+      `SELECT booking_interval_minutes, appointment_buffer_minutes
         FROM settings 
         WHERE id = 1 
         LIMIT 1`,

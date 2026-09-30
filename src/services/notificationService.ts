@@ -13,6 +13,7 @@ import {
     defaultAppointmentReminderMessage,
     formatAppointmentMessage,
 } from "./appointmentMessageTemplateService.js";
+import { formatAppointmentDate, formatAppointmentTime } from "../utils/appointmentDateTime.js";
 
 export const deliverNotification = async (
     notification: NotificationRow,
@@ -46,24 +47,20 @@ export const deliverNotification = async (
 export const createAppointmentConfirmation = async (appointment: AppointmentRow): Promise<void> => {
     if (appointment.customer_id === null) return;
     const settings = await settingsService.getSettings();
-    const configuredMessage = formatAppointmentMessage(
+    const message = formatAppointmentMessage(
         settings?.appointment_confirmation_message ?? defaultAppointmentConfirmationMessage,
         appointment,
     );
-    const customerName = appointment.customer_name ?? "there";
-    const salonName = appointment.salon_name ?? "the salon";
-    const date = String(appointment.appointment_date).slice(0, 10);
-    const time = String(appointment.start_time).slice(0, 5);
-    const message = `Hi ${customerName}! 👋 Your appointment at ${salonName} has been successfully confirmed for ${date} at ${time}. We look forward to seeing you! Thank you for choosing us. 💙\n\nආයුබෝවන් ${customerName}! 👋 ${salonName} වෙත ඔබ වෙන්කරගත් ඒපොයින්ට්මන්ට් එක ${date} දින ${time} ට සාර්ථකව තහවුරු කර ඇත. ඔබව සාදරයෙන් බලාපොරොත්තු වෙමු! අපව තෝරාගැනීම පිළිබඳව ස්තූතියි. 💙`;
     const notification = await repository.create({
-        appointmentId: appointment.id, customerId: appointment.customer_id, type: "Email",
+        appointmentId: appointment.id,
+        customerId: appointment.customer_id,
+        type: "Email",
         title: "Appointment Confirmation",
-        message: configuredMessage || message,
+        message,
     });
     if (notification) await deliverNotification(notification);
-    await createAppointmentWhatsAppNotification(appointment, "Appointment Confirmation", notification?.message);
+    await createAppointmentWhatsAppNotification(appointment, "Appointment Confirmation", message);
 };
-
 const createAppointmentStatusNotification = async (
     appointment: AppointmentRow,
     title: string,
@@ -108,14 +105,13 @@ export const createAppointmentCancellation = (appointment: AppointmentRow): Prom
     createAppointmentStatusNotification(
         appointment,
         "Appointment Cancelled",
-        `Hi ${appointment.customer_name ?? "there"}, your scheduled appointment time (${String(appointment.start_time).slice(0, 5)}) has now passed, so your appointment at ${appointment.salon_name ?? "the salon"} has been automatically cancelled. If you would like to book a new appointment, please visit our website. We look forward to serving you again!\n\nආයුබෝවන් ${appointment.customer_name ?? "there"}, ඔබගේ නියමිත ඒපොයින්ට්මන්ට් වේලාව (${String(appointment.start_time).slice(0, 5)}) මේ වන විට පසුවී ඇති බැවින්, ${appointment.salon_name ?? "the salon"} හි ඔබගේ ඒපොයින්ට්මන්ට් එක ස්වයංක්‍රීයව අවලංගු කර ඇත. නැවත ඒපොයින්ට්මන්ට් එකක් වෙන්කර ගැනීමට කරුණාකර අපගේ වෙබ් අඩවියට පිවිසෙන්න. ඔබට නැවතත් සේවය කිරීමට අපි බලාපොරොත්තු වෙමු!`,
+        `Hi ${appointment.customer_name ?? "Customer"}! Your appointment at ${appointment.salon_name ?? "A Line Salon"} has been automatically cancelled because its scheduled time (${formatAppointmentTime(appointment.start_time)}) has passed. Please visit our website to rebook.`,
     );
-
 export const createAppointmentStarted = (appointment: AppointmentRow): Promise<void> =>
     createAppointmentStatusNotification(
         appointment,
         "Appointment Started",
-        `Your appointment for ${appointment.appointment_date} at ${appointment.start_time} has started.`,
+        `Your appointment for ${formatAppointmentDate(appointment.appointment_date)} at ${formatAppointmentTime(appointment.start_time)} has started.`,
     );
 
 export const createAppointmentReminder = async (appointment: AppointmentRow): Promise<void> => {
@@ -123,48 +119,27 @@ export const createAppointmentReminder = async (appointment: AppointmentRow): Pr
     const settings = await settingsService.getSettings();
     const reminderMinutes = settings?.appointment_reminder_minutes ?? 15;
     const reminderTemplate = settings?.appointment_reminder_message ?? defaultAppointmentReminderMessage;
-    const customerName = appointment.customer_name ?? "there";
-    const salonName = appointment.salon_name ?? "the salon";
-    const time = String(appointment.start_time).slice(0, 5);
-    const message = `Hi ${customerName}! 👋 Just a friendly reminder that your appointment at ${salonName} is scheduled for ${time} today, which is in 15 minutes. We look forward to seeing you soon!\n\nආයුබෝවන් ${customerName}! 👋 මෙය ඔබගේ ඒපොයින්ට්මන්ට් එක පිළිබඳ සුහද මතක් කිරීමකි. ${salonName} හි ඔබගේ ඒපොයින්ට්මන්ට් එක අද ${time} ට, එනම් තවත් විනාඩි 15කින් යෙදී ඇත. ඔබව ඉක්මනින් හමුවීමට අපි බලාපොරොත්තු වෙමු!`;
+    const message = formatAppointmentMessage(reminderTemplate, appointment, reminderMinutes);
     const notification = await repository.create({
         appointmentId: appointment.id,
         customerId: appointment.customer_id,
         type: "Email",
         title: "Appointment Reminder",
-        message: reminderTemplate
-            ? formatAppointmentMessage(reminderTemplate, appointment, reminderMinutes)
-            : message,
+        message,
     });
-    if (!notification)
-        return;
+    if (!notification) return;
 
     const frontendUrl = process.env.FRONTEND_URL?.replace(/\/+$/, "");
     const cancellationUrl = frontendUrl ? `${frontendUrl}/appointments?cancel=${appointment.id}` : null;
     await deliverNotification(notification, cancellationUrl ? {
-        text: `${formatAppointmentMessage(reminderTemplate, appointment, reminderMinutes)}\n\nNeed to cancel? Review and confirm your cancellation here: ${cancellationUrl}`,
-        html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#2b2924;max-width:560px;margin:auto">
-          <div style="padding:24px;border:1px solid #e5dfd4;border-radius:14px">
-            <h2 style="margin:0 0 12px">Appointment reminder</h2>
-            <p style="margin:0 0 18px">${formatAppointmentMessage(reminderTemplate, appointment, reminderMinutes)}</p>
-            <p style="margin:0 0 10px;color:#6f675d">If you can no longer attend,
-             you can review and confirm the cancellation securely in your account.</p>
-            <a href="${cancellationUrl}" style="display:inline-block;padding:11px 18px;border-radius:8px;color:#fff;background:#b83249;
-            text-decoration:none;font-weight:700">Cancel booking</a>
-            <p style="margin:14px 0 0;color:#8a8176;font-size:12px">Signing in may be required. The appointment is not cancelled until you confirm.</p>
-          </div>
-        </div>`,
+        text: `${message}\n\nNeed to cancel? Review and confirm your cancellation here: ${cancellationUrl}`,
+        html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#2b2924;max-width:560px;margin:auto"><div style="padding:24px;border:1px solid #e5dfd4;border-radius:14px"><h2>Appointment reminder</h2><p style="white-space:pre-line">${message}</p><p>If you can no longer attend, review and confirm cancellation in your account.</p><a href="${cancellationUrl}">Cancel booking</a><p>Signing in may be required. The appointment is not cancelled until you confirm.</p></div></div>`,
     } : undefined);
-    const staffRecipients = [...new Set([
-        appointment.admin_email,
-        appointment.employee_email,
-    ].filter((email): email is string => Boolean(email)))];
-    await Promise.allSettled(
-        staffRecipients.map((email) => sendEmail(email, "Appointment Reminder", formatAppointmentMessage(reminderTemplate, appointment, reminderMinutes))),
-    );
+    const staffRecipients = [...new Set([appointment.admin_email, appointment.employee_email]
+        .filter((email): email is string => Boolean(email)))];
+    await Promise.allSettled(staffRecipients.map((email) => sendEmail(email, "Appointment Reminder", message)));
     await createWhatsAppAppointmentReminder(appointment, reminderTemplate, reminderMinutes);
 };
-
 const createWhatsAppAppointmentReminder = async (
     appointment: AppointmentRow,
     reminderTemplate: string,
@@ -178,10 +153,7 @@ const createWhatsAppAppointmentReminder = async (
     );
     if (!claimed) return;
 
-    const result = await sendWhatsAppMessage(
-        appointment.customer_phone,
-        formatAppointmentMessage(reminderTemplate, appointment, reminderMinutes),
-    );
+    const result = await sendWhatsAppMessage(appointment.customer_phone, formatAppointmentMessage(reminderTemplate, appointment, reminderMinutes));
     if (result.success) {
         await reminderLogRepository.markSent(appointment.id, "whatsapp", result.providerMessageId);
         return;
@@ -196,7 +168,7 @@ export const createAppointmentCompletion = (appointment: AppointmentRow): Promis
     createAppointmentStatusNotification(
         appointment,
         "Appointment Completed",
-        `Your appointment for ${appointment.appointment_date} at ${appointment.start_time} has been completed. Thank you for visiting us.`,
+        `Your appointment for ${formatAppointmentDate(appointment.appointment_date)} at ${formatAppointmentTime(appointment.start_time)} has been completed. Thank you for visiting us.`,
     );
 
 export const getNotifications = (filters: NotificationFilters) => repository.findAll(filters);
